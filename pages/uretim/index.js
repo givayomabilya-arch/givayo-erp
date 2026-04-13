@@ -17,7 +17,7 @@ export default function Uretim() {
   const [isEmirleri, setIsEmirleri] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
-  const [seciliSiparisler, setSeciliSiparisler] = useState([])
+  const [seciliUrunler, setSeciliUrunler] = useState([]) // stok_kodu listesi
   const [atamalar, setAtamalar] = useState({
     ebatlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Ebatlama 1' }],
     bantlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Bantlama 1' }],
@@ -33,7 +33,7 @@ export default function Uretim() {
   async function yukle() {
     setLoading(true)
     const [{ data: b }, { data: ie }] = await Promise.all([
-      supabase.from('siparisler').select('id,siparis_no,musteri_adi,urun_stok_kodu,adet,durum,platform').eq('durum', 'beklemede').order('created_at'),
+      supabase.from('siparisler').select('id,siparis_no,musteri_adi,urun_stok_kodu,adet,durum,platform').eq('durum', 'beklemede').order('urun_stok_kodu'),
       supabase.from('is_emirleri').select('*').order('created_at', { ascending: false }).limit(20),
     ])
     setBekleyenler(b || [])
@@ -41,10 +41,27 @@ export default function Uretim() {
     setLoading(false)
   }
 
-  function toggleSiparis(id) {
-    setSeciliSiparisler(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  // Siparişleri ürüne göre grupla
+  function gruplar() {
+    const g = {}
+    for (const s of bekleyenler) {
+      if (!g[s.urun_stok_kodu]) g[s.urun_stok_kodu] = { stok: s.urun_stok_kodu, adet: 0, ids: [], sayi: 0 }
+      g[s.urun_stok_kodu].adet += s.adet
+      g[s.urun_stok_kodu].ids.push(s.id)
+      g[s.urun_stok_kodu].sayi++
+    }
+    return Object.values(g).sort((a, b) => b.adet - a.adet)
+  }
+
+  function toggleUrun(stok) {
+    setSeciliUrunler(prev =>
+      prev.includes(stok) ? prev.filter(x => x !== stok) : [...prev, stok]
     )
+  }
+
+  function tumunuSec() {
+    const hepsi = gruplar().map(g => g.stok)
+    setSeciliUrunler(prev => prev.length === hepsi.length ? [] : hepsi)
   }
 
   function satirEkle(tip) {
@@ -68,30 +85,31 @@ export default function Uretim() {
   }
 
   async function isEmriOlustur() {
-    if (!seciliSiparisler.length) return alert('En az bir sipariş seçin')
+    if (!seciliUrunler.length) return alert('En az bir ürün seçin')
     setKayit(true)
+
+    const secilenGruplar = gruplar().filter(g => seciliUrunler.includes(g.stok))
+    const tumIds = secilenGruplar.flatMap(g => g.ids)
+    const toplamAdet = secilenGruplar.reduce((s, g) => s + g.adet, 0)
     const no = 'İE-' + new Date().getFullYear() + '-' + String(isEmirleri.length + 1).padStart(3, '0')
-    const secilenSiparisler = bekleyenler.filter(s => seciliSiparisler.includes(s.id))
-    const toplamAdet = secilenSiparisler.reduce((s, x) => s + x.adet, 0)
 
     const { error } = await supabase.from('is_emirleri').insert({
       is_emri_no: no,
-      siparis_idler: seciliSiparisler,
-      urun_listesi: secilenSiparisler.map(s => ({ stok_kodu: s.urun_stok_kodu, adet: s.adet })),
+      siparis_idler: tumIds,
+      urun_listesi: secilenGruplar.map(g => ({ stok_kodu: g.stok, adet: g.adet })),
       toplam_adet: toplamAdet,
       atamalar: atamalar,
       durum: 'aktif',
     })
 
     if (!error) {
-      // Siparişleri "üretimde" yap
-      await supabase.from('siparisler').update({ durum: 'uretimde' }).in('id', seciliSiparisler)
+      await supabase.from('siparisler').update({ durum: 'uretimde' }).in('id', tumIds)
     }
 
     setKayit(false)
     if (error) return alert('Hata: ' + error.message)
     setModal(false)
-    setSeciliSiparisler([])
+    setSeciliUrunler([])
     yukle()
   }
 
@@ -100,6 +118,9 @@ export default function Uretim() {
     const label = { aktif: 'Aktif', tamamlandi: 'Tamamlandı', iptal: 'İptal' }
     return <span className={`badge ${map[d] || 'badge-gray'}`}>{label[d] || d}</span>
   }
+
+  const liste = gruplar()
+  const seciliAdet = liste.filter(g => seciliUrunler.includes(g.stok)).reduce((s, g) => s + g.adet, 0)
 
   return (
     <div className="p-6">
@@ -112,45 +133,66 @@ export default function Uretim() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Bekleyen Siparişler */}
+        {/* Bekleyen Siparişler - Ürüne Göre Gruplu */}
         <div className="card">
-          <div className="text-sm font-medium text-gray-300 mb-3">
-            Bekleyen Siparişler
-            <span className="ml-2 badge badge-blue">{bekleyenler.length}</span>
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-sm font-medium text-gray-300">
+              Bekleyen Siparişler
+              <span className="ml-2 badge badge-blue">{bekleyenler.length} sipariş</span>
+              <span className="ml-1 badge badge-gray">{liste.length} ürün çeşidi</span>
+            </div>
+            {liste.length > 0 && (
+              <button className="btn btn-sm text-xs" onClick={tumunuSec}>
+                {seciliUrunler.length === liste.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+              </button>
+            )}
           </div>
           {loading ? (
             <div className="text-center py-6 text-gray-600">Yükleniyor…</div>
-          ) : bekleyenler.length === 0 ? (
+          ) : liste.length === 0 ? (
             <div className="text-center py-6 text-gray-600">Bekleyen sipariş yok</div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr>
                   <th className="th w-8"></th>
-                  <th className="th">Ürün</th>
-                  <th className="th">Adet</th>
-                  <th className="th">Platform</th>
+                  <th className="th">Ürün (Stok Kodu)</th>
+                  <th className="th text-center">Sipariş</th>
+                  <th className="th text-center">Toplam Adet</th>
                 </tr>
               </thead>
               <tbody>
-                {bekleyenler.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => toggleSiparis(s.id)}>
+                {liste.map(g => (
+                  <tr
+                    key={g.stok}
+                    className={`hover:bg-gray-800/40 cursor-pointer ${seciliUrunler.includes(g.stok) ? 'bg-blue-950/30' : ''}`}
+                    onClick={() => toggleUrun(g.stok)}
+                  >
                     <td className="td">
-                      <input type="checkbox" checked={seciliSiparisler.includes(s.id)} onChange={() => toggleSiparis(s.id)} className="accent-blue-500" />
+                      <input
+                        type="checkbox"
+                        checked={seciliUrunler.includes(g.stok)}
+                        onChange={() => toggleUrun(g.stok)}
+                        className="accent-blue-500"
+                      />
                     </td>
-                    <td className="td font-medium text-xs">{s.urun_stok_kodu}</td>
+                    <td className="td font-medium text-sm">{g.stok}</td>
                     <td className="td text-center">
-                      <span className="badge badge-blue">{s.adet}</span>
+                      <span className="text-xs text-gray-500">{g.sayi} müşteri</span>
                     </td>
-                    <td className="td text-xs text-gray-500">{s.platform}</td>
+                    <td className="td text-center">
+                      <span className="badge badge-blue text-sm font-bold">{g.adet}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-          {seciliSiparisler.length > 0 && (
-            <div className="mt-3 flex justify-between items-center text-sm">
-              <span className="text-gray-400">{seciliSiparisler.length} seçili</span>
+          {seciliUrunler.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
+              <span className="text-sm text-gray-400">
+                {seciliUrunler.length} çeşit · toplam <span className="text-blue-400 font-semibold">{seciliAdet} adet</span>
+              </span>
               <button className="btn-primary btn-sm" onClick={() => setModal(true)}>
                 İş Emri Oluştur →
               </button>
@@ -174,10 +216,13 @@ export default function Uretim() {
                     <span className="text-sm font-medium text-blue-300 font-mono">{ie.is_emri_no}</span>
                     {durumBadge(ie.durum)}
                   </div>
-                  <div className="text-xs text-gray-500 mb-2">
+                  <div className="text-xs text-gray-400 mb-1">
                     {ie.urun_listesi?.map(u => `${u.stok_kodu} ×${u.adet}`).join(' · ')}
                   </div>
-                  <div className="text-xs text-gray-600">{new Date(ie.created_at).toLocaleString('tr-TR')}</div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-600">{new Date(ie.created_at).toLocaleString('tr-TR')}</span>
+                    <span className="text-xs text-gray-500">Toplam: {ie.toplam_adet} adet</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -194,34 +239,33 @@ export default function Uretim() {
               <button className="btn btn-sm" onClick={() => setModal(false)}>✕</button>
             </div>
             <div className="p-4 space-y-4">
-              {/* Seçili Siparişler */}
+              {/* Seçili Ürünler */}
               <div>
-                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seçili Siparişler</div>
-                {seciliSiparisler.length === 0 ? (
+                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Seçili Ürünler</div>
+                {seciliUrunler.length === 0 ? (
                   <div className="text-sm text-gray-500 bg-gray-800 rounded-lg p-3">
-                    Sol panelden sipariş seçin veya devam edin (tüm bekleyenler dahil edilir)
+                    Sol panelden ürün seçin
                   </div>
                 ) : (
-                  <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-300">
-                    {bekleyenler.filter(s => seciliSiparisler.includes(s.id)).map(s => (
-                      <span key={s.id} className="inline-block bg-blue-900/50 text-blue-300 rounded px-2 py-0.5 text-xs mr-1 mb-1">
-                        {s.urun_stok_kodu} ×{s.adet}
-                      </span>
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    {gruplar().filter(g => seciliUrunler.includes(g.stok)).map(g => (
+                      <div key={g.stok} className="flex justify-between items-center py-1 border-b border-gray-700 last:border-0">
+                        <span className="text-sm font-medium text-gray-200">{g.stok}</span>
+                        <span className="badge badge-blue">{g.adet} adet · {g.sayi} sipariş</span>
+                      </div>
                     ))}
+                    <div className="pt-2 mt-1 text-right text-sm font-medium text-blue-400">
+                      Toplam: {seciliAdet} adet
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Ebatlama */}
-              <AtamaBlok tip="ebatlama" baslik="Ebatlama" satirlar={atamalar.ebatlama} istasyonlar={ISTASYONLAR.ebatlama} onEkle={() => satirEkle('ebatlama')} onSil={(i) => satirSil('ebatlama', i)} onGuncelle={(i, f, v) => satirGuncelle('ebatlama', i, f, v)} />
+              <AtamaBlok baslik="Ebatlama" satirlar={atamalar.ebatlama} istasyonlar={ISTASYONLAR.ebatlama} onEkle={() => satirEkle('ebatlama')} onSil={(i) => satirSil('ebatlama', i)} onGuncelle={(i, f, v) => satirGuncelle('ebatlama', i, f, v)} />
+              <AtamaBlok baslik="Bantlama" satirlar={atamalar.bantlama} istasyonlar={ISTASYONLAR.bantlama} onEkle={() => satirEkle('bantlama')} onSil={(i) => satirSil('bantlama', i)} onGuncelle={(i, f, v) => satirGuncelle('bantlama', i, f, v)} />
+              <AtamaBlok baslik="Delik İşleme" satirlar={atamalar.delik} istasyonlar={ISTASYONLAR.delik} onEkle={() => satirEkle('delik')} onSil={(i) => satirSil('delik', i)} onGuncelle={(i, f, v) => satirGuncelle('delik', i, f, v)} />
 
-              {/* Bantlama */}
-              <AtamaBlok tip="bantlama" baslik="Bantlama" satirlar={atamalar.bantlama} istasyonlar={ISTASYONLAR.bantlama} onEkle={() => satirEkle('bantlama')} onSil={(i) => satirSil('bantlama', i)} onGuncelle={(i, f, v) => satirGuncelle('bantlama', i, f, v)} />
-
-              {/* Delik */}
-              <AtamaBlok tip="delik" baslik="Delik İşleme" satirlar={atamalar.delik} istasyonlar={ISTASYONLAR.delik} onEkle={() => satirEkle('delik')} onSil={(i) => satirSil('delik', i)} onGuncelle={(i, f, v) => satirGuncelle('delik', i, f, v)} />
-
-              {/* Aksesuar + Kartoncu */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Aksesuar</div>
@@ -237,7 +281,6 @@ export default function Uretim() {
                 </div>
               </div>
 
-              {/* Paketleme */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <div className="text-xs text-gray-400 uppercase tracking-wide">Paketleme</div>
@@ -258,8 +301,8 @@ export default function Uretim() {
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
               <button className="btn" onClick={() => setModal(false)}>İptal</button>
-              <button className="btn-primary" onClick={isEmriOlustur} disabled={kayit}>
-                {kayit ? 'Oluşturuluyor…' : 'İş Emrini Oluştur'}
+              <button className="btn-primary" onClick={isEmriOlustur} disabled={kayit || !seciliUrunler.length}>
+                {kayit ? 'Oluşturuluyor…' : `İş Emrini Oluştur (${seciliAdet} adet)`}
               </button>
             </div>
           </div>
