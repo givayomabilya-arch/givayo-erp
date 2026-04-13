@@ -18,6 +18,7 @@ export default function Siparisler() {
   const [modal, setModal] = useState(null) // null | 'manuel' | 'excel' | 'detay'
   const [secili, setSecili] = useState(null)
   const [filtre, setFiltre] = useState({ arama: '', durum: '', platform: '' })
+  const [sekme, setSekme] = useState('aktif')
   const [form, setForm] = useState({})
   const [excelOnizleme, setExcelOnizleme] = useState([])
   const [kayit, setKayit] = useState(false)
@@ -36,6 +37,9 @@ export default function Siparisler() {
 
   function filtreliSiparisler() {
     return siparisler.filter(s => {
+      // Sekmeye göre filtrele
+      if (sekme === 'aktif' && s.durum === 'tamamlandi') return false
+      if (sekme === 'tamamlandi' && s.durum !== 'tamamlandi') return false
       if (filtre.arama) {
         const q = filtre.arama.toUpperCase()
         if (!s.siparis_no?.toUpperCase().includes(q) &&
@@ -62,7 +66,7 @@ export default function Siparisler() {
       adet: parseInt(form.adet) || 1,
       birim_fiyat: parseFloat(form.birim_fiyat) || 0,
       durum: 'beklemede',
-      not: form.not || null,
+      aciklama: form.not || null,
     })
     setKayit(false)
     if (error) return alert('Hata: ' + error.message)
@@ -183,6 +187,24 @@ export default function Siparisler() {
         </div>
       </div>
 
+      {/* Sekmeler */}
+      <div className="flex gap-0 border-b border-gray-800 mb-4">
+        <button
+          className={}
+          onClick={() => { setSekme('aktif'); setFiltre(p => ({...p, durum: ''})) }}
+        >
+          Aktif Siparişler
+          <span className="ml-2 badge badge-blue">{siparisler.filter(s => s.durum !== 'tamamlandi').length}</span>
+        </button>
+        <button
+          className={}
+          onClick={() => { setSekme('tamamlandi'); setFiltre(p => ({...p, durum: ''})) }}
+        >
+          Tamamlananlar
+          <span className="ml-2 badge badge-green">{siparisler.filter(s => s.durum === 'tamamlandi').length}</span>
+        </button>
+      </div>
+
       {/* Filtreler */}
       <div className="flex gap-3 mb-4 flex-wrap">
         <input
@@ -193,7 +215,7 @@ export default function Siparisler() {
         />
         <select className="input w-40" value={filtre.durum} onChange={e => setFiltre(p => ({ ...p, durum: e.target.value }))}>
           <option value="">Tüm Durumlar</option>
-          {DURUMLAR.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+          {DURUMLAR.filter(d => sekme === 'aktif' ? d.value !== 'tamamlandi' : d.value === 'tamamlandi').map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
         </select>
         <select className="input w-40" value={filtre.platform} onChange={e => setFiltre(p => ({ ...p, platform: e.target.value }))}>
           <option value="">Tüm Platformlar</option>
