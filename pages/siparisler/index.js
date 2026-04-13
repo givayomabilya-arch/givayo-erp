@@ -145,7 +145,7 @@ export default function Siparisler() {
   async function excelKaydet() {
     if (!excelOnizleme.length) return
     setKayit(true)
-    const { error } = await supabase.from('siparisler').insert(excelOnizleme)
+    const { error } = await supabase.from('siparisler').upsert(excelOnizleme, { onConflict: 'siparis_no', ignoreDuplicates: true })
     setKayit(false)
     if (error) return alert('Hata: ' + error.message)
     setModal(null); setExcelOnizleme([])
