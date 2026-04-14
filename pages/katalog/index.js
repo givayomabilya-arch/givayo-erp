@@ -24,7 +24,8 @@ export default function Katalog() {
   const [katFiltre, setKatFiltre] = useState('')
   const [kayit, setKayit] = useState(false)
   const [sayfa, setSayfa] = useState(1)
-  const [yukleniyor, setYukleniyor] = useState({ kesim: false, delik: false })
+  const [yukleniyor, setYukleniyor] = useState({})
+  const [yeniParcaAdi, setYeniParcaAdi] = useState('')
   const SAYFA = 30
 
   useEffect(() => { yukle() }, [])
@@ -97,43 +98,73 @@ export default function Katalog() {
     setModal('duzenle')
   }
 
-  async function dosyaYukle(e, tip) {
+  // Kesim listesi yükleme (tek dosya)
+  async function kesimYukle(e) {
     const file = e.target.files[0]
     if (!file || !secili) return
-    setYukleniyor(p => ({ ...p, [tip]: true }))
-
-    const dosyaAdi = `${secili.stok_kodu.replace(/[^a-zA-Z0-9]/g, '_')}_${tip}.${file.name.split('.').pop()}`
-    const { data, error } = await supabase.storage
-      .from('uretim-dosyalari')
-      .upload(dosyaAdi, file, { upsert: true })
-
-    if (error) {
-      setYukleniyor(p => ({ ...p, [tip]: false }))
-      return alert('Yükleme hatası: ' + error.message)
-    }
-
+    setYukleniyor(p => ({ ...p, kesim: true }))
+    const dosyaAdi = `${secili.stok_kodu.replace(/[^a-zA-Z0-9]/g, '_')}_kesim.${file.name.split('.').pop()}`
+    const { error } = await supabase.storage.from('uretim-dosyalari').upload(dosyaAdi, file, { upsert: true })
+    if (error) { setYukleniyor(p => ({ ...p, kesim: false })); return alert('Hata: ' + error.message) }
     const { data: urlData } = supabase.storage.from('uretim-dosyalari').getPublicUrl(dosyaAdi)
-    const url = urlData.publicUrl
-
-    const alan = tip === 'kesim' ? 'kesim_listesi_url' : 'delik_projesi_url'
-    const { error: updateError } = await supabase.from('urunler').update({ [alan]: url }).eq('id', secili.id)
-
-    if (!updateError) {
-      setSecili(prev => ({ ...prev, [alan]: url }))
-      setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, [alan]: url } : u))
-    }
-
-    setYukleniyor(p => ({ ...p, [tip]: false }))
+    await supabase.from('urunler').update({ kesim_listesi_url: urlData.publicUrl }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, kesim_listesi_url: urlData.publicUrl }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, kesim_listesi_url: urlData.publicUrl } : u))
+    setYukleniyor(p => ({ ...p, kesim: false }))
     e.target.value = ''
   }
 
-  async function dosyaSil(tip) {
-    if (!secili) return
-    if (!confirm('Bu dosyayı kaldır?')) return
-    const alan = tip === 'kesim' ? 'kesim_listesi_url' : 'delik_projesi_url'
-    await supabase.from('urunler').update({ [alan]: null }).eq('id', secili.id)
-    setSecili(prev => ({ ...prev, [alan]: null }))
-    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, [alan]: null } : u))
+  async function kesimSil() {
+    if (!confirm('Kesim listesini kaldır?')) return
+    await supabase.from('urunler').update({ kesim_listesi_url: null }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, kesim_listesi_url: null }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, kesim_listesi_url: null } : u))
+  }
+
+  // Delik projeleri - jsonb array: [{ad, url}]
+  function delikProjeler() {
+    if (!secili) return []
+    try {
+      if (Array.isArray(secili.delik_projesi_url)) return secili.delik_projesi_url
+      if (typeof secili.delik_projesi_url === 'string' && secili.delik_projesi_url.startsWith('[')) {
+        return JSON.parse(secili.delik_projesi_url)
+      }
+      if (secili.delik_projesi_url) return [{ ad: 'Delik Projesi', url: secili.delik_projesi_url }]
+    } catch (e) {}
+    return []
+  }
+
+  async function delikParcaEkle() {
+    const ad = yeniParcaAdi.trim() || `Parça ${delikProjeler().length + 1}`
+    const yeniListe = [...delikProjeler(), { ad, url: null }]
+    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
+    setYeniParcaAdi('')
+  }
+
+  async function delikDosyaYukle(e, idx) {
+    const file = e.target.files[0]
+    if (!file || !secili) return
+    setYukleniyor(p => ({ ...p, [`delik_${idx}`]: true }))
+    const parca = delikProjeler()[idx]
+    const dosyaAdi = `${secili.stok_kodu.replace(/[^a-zA-Z0-9]/g, '_')}_delik_${idx + 1}.${file.name.split('.').pop()}`
+    const { error } = await supabase.storage.from('uretim-dosyalari').upload(dosyaAdi, file, { upsert: true })
+    if (error) { setYukleniyor(p => ({ ...p, [`delik_${idx}`]: false })); return alert('Hata: ' + error.message) }
+    const { data: urlData } = supabase.storage.from('uretim-dosyalari').getPublicUrl(dosyaAdi)
+    const yeniListe = delikProjeler().map((p, i) => i === idx ? { ...p, url: urlData.publicUrl } : p)
+    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: JSON.stringify(yeniListe) } : u))
+    setYukleniyor(p => ({ ...p, [`delik_${idx}`]: false }))
+    e.target.value = ''
+  }
+
+  async function delikParcaSil(idx) {
+    if (!confirm('Bu parçayı kaldır?')) return
+    const yeniListe = delikProjeler().filter((_, i) => i !== idx)
+    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: JSON.stringify(yeniListe) } : u))
   }
 
   const liste = filtreli()
@@ -167,26 +198,30 @@ export default function Katalog() {
         <div className="text-center py-12 text-gray-600"><div className="text-4xl mb-3">🗂️</div><div>Ürün bulunamadı</div></div>
       ) : (
         <div className="grid grid-cols-3 gap-3 xl:grid-cols-4">
-          {sayfalanan.map(u => (
-            <div key={u.id} className="card hover:border-gray-600 cursor-pointer transition-colors" onClick={() => { setSecili(u); setModal('detay') }}>
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs text-gray-500 font-mono">{u.stok_kodu}</span>
-                {u.kesim_listesi_url || u.delik_projesi_url ? (
-                  <span className="text-xs bg-green-900 text-green-300 px-1.5 py-0.5 rounded">📄</span>
-                ) : (
-                  <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">—</span>
-                )}
+          {sayfalanan.map(u => {
+            const dp = (() => { try { if (Array.isArray(u.delik_projesi_url)) return u.delik_projesi_url; if (typeof u.delik_projesi_url === 'string' && u.delik_projesi_url.startsWith('[')) return JSON.parse(u.delik_projesi_url); if (u.delik_projesi_url) return [{}]; } catch(e){} return [] })()
+            const dosyaVar = u.kesim_listesi_url || dp.length > 0
+            return (
+              <div key={u.id} className="card hover:border-gray-600 cursor-pointer transition-colors" onClick={() => { setSecili(u); setModal('detay') }}>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs text-gray-500 font-mono">{u.stok_kodu}</span>
+                  {dosyaVar ? (
+                    <span className="text-xs bg-green-900 text-green-300 px-1.5 py-0.5 rounded">📄 {dp.filter(p=>p.url).length > 0 ? dp.filter(p=>p.url).length + ' delik' : ''}</span>
+                  ) : (
+                    <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">—</span>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-gray-200 mb-1 leading-tight">{u.urun_adi}</div>
+                <div className="text-xs text-gray-500 mb-3">{u.renk} · {u.kategori}</div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-400">
+                    {u.fiyat > 0 ? `₺${u.fiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '—'}
+                  </span>
+                  <span className="text-xs text-gray-600">{u.barkod}</span>
+                </div>
               </div>
-              <div className="text-sm font-medium text-gray-200 mb-1 leading-tight">{u.urun_adi}</div>
-              <div className="text-xs text-gray-500 mb-3">{u.renk} · {u.kategori}</div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-blue-400">
-                  {u.fiyat > 0 ? `₺${u.fiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : '—'}
-                </span>
-                <span className="text-xs text-gray-600">{u.barkod}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -221,66 +256,69 @@ export default function Katalog() {
                 <div><div className="text-xs text-gray-500 mb-1">MODEL</div><div>{secili.model_kodu || '—'}</div></div>
               </div>
 
-              {/* Üretim Dosyaları */}
+              {/* KESİM LİSTESİ */}
               <div className="border-t border-gray-800 pt-3">
-                <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">ÜRETİM DOSYALARI</div>
-
-                {/* Kesim Listesi */}
-                <div className="bg-gray-800 rounded-lg p-3 mb-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">📄 Kesim Listesi</span>
-                    {secili.kesim_listesi_url && (
-                      <span className="badge badge-green text-xs">Yüklendi ✓</span>
-                    )}
-                  </div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">📄 Kesim Listesi</div>
+                <div className="bg-gray-800 rounded-lg p-3">
                   {secili.kesim_listesi_url ? (
                     <div className="flex gap-2">
-                      <a href={secili.kesim_listesi_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">
-                        📥 İndir / Görüntüle
-                      </a>
-                      <button className="btn btn-sm btn-danger text-xs" onClick={() => dosyaSil('kesim')}>Kaldır</button>
+                      <a href={secili.kesim_listesi_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">📥 İndir / Görüntüle</a>
+                      <button className="btn btn-sm btn-danger text-xs" onClick={kesimSil}>Kaldır</button>
                     </div>
                   ) : (
                     <label className="flex items-center justify-center gap-2 border border-dashed border-gray-600 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-950/20 transition-colors">
-                      {yukleniyor.kesim ? (
-                        <span className="text-xs text-gray-400">Yükleniyor…</span>
-                      ) : (
-                        <>
-                          <span className="text-xs text-gray-400">📤 Kesim listesi yükle (.xlsx, .pdf)</span>
-                          <input type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={e => dosyaYukle(e, 'kesim')} />
-                        </>
+                      {yukleniyor.kesim ? <span className="text-xs text-gray-400">Yükleniyor…</span> : (
+                        <><span className="text-xs text-gray-400">📤 Kesim listesi yükle (.xlsx, .pdf)</span><input type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={kesimYukle} /></>
                       )}
                     </label>
                   )}
                 </div>
+              </div>
 
-                {/* Delik Projesi */}
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">🔩 Delik Projesi</span>
-                    {secili.delik_projesi_url && (
-                      <span className="badge badge-green text-xs">Yüklendi ✓</span>
-                    )}
-                  </div>
-                  {secili.delik_projesi_url ? (
-                    <div className="flex gap-2">
-                      <a href={secili.delik_projesi_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">
-                        📥 İndir / Görüntüle
-                      </a>
-                      <button className="btn btn-sm btn-danger text-xs" onClick={() => dosyaSil('delik')}>Kaldır</button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 border border-dashed border-gray-600 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-950/20 transition-colors">
-                      {yukleniyor.delik ? (
-                        <span className="text-xs text-gray-400">Yükleniyor…</span>
+              {/* DELİK PROJELERİ */}
+              <div className="border-t border-gray-800 pt-3">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">🔩 Delik Projeleri</div>
+                  <span className="text-xs text-gray-500">{delikProjeler().length} parça</span>
+                </div>
+
+                {/* Mevcut parçalar */}
+                <div className="space-y-2 mb-3">
+                  {delikProjeler().map((parca, idx) => (
+                    <div key={idx} className="bg-gray-800 rounded-lg p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-200">{parca.ad || `Parça ${idx + 1}`}</span>
+                        <button className="text-xs text-red-400 hover:text-red-300" onClick={() => delikParcaSil(idx)}>× Kaldır</button>
+                      </div>
+                      {parca.url ? (
+                        <div className="flex gap-2">
+                          <a href={parca.url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">📥 İndir / Görüntüle</a>
+                          <label className="btn btn-sm text-xs cursor-pointer">
+                            🔄 Değiştir
+                            <input type="file" accept=".pdf" className="hidden" onChange={e => delikDosyaYukle(e, idx)} />
+                          </label>
+                        </div>
                       ) : (
-                        <>
-                          <span className="text-xs text-gray-400">📤 Delik projesi yükle (.pdf)</span>
-                          <input type="file" accept=".pdf,.dwg,.dxf" className="hidden" onChange={e => dosyaYukle(e, 'delik')} />
-                        </>
+                        <label className="flex items-center justify-center gap-2 border border-dashed border-gray-600 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-950/20 transition-colors">
+                          {yukleniyor[`delik_${idx}`] ? <span className="text-xs text-gray-400">Yükleniyor…</span> : (
+                            <><span className="text-xs text-gray-400">📤 PDF yükle</span><input type="file" accept=".pdf" className="hidden" onChange={e => delikDosyaYukle(e, idx)} /></>
+                          )}
+                        </label>
                       )}
-                    </label>
-                  )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Yeni parça ekle */}
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 text-sm"
+                    placeholder="Parça adı (örn: Yan Panel)"
+                    value={yeniParcaAdi}
+                    onChange={e => setYeniParcaAdi(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && delikParcaEkle()}
+                  />
+                  <button className="btn btn-sm btn-primary" onClick={delikParcaEkle}>+ Parça Ekle</button>
                 </div>
               </div>
             </div>
@@ -305,51 +343,27 @@ export default function Katalog() {
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Stok Kodu *</label>
-                  <input className="input" value={form.stok_kodu} onChange={e => setForm(p => ({ ...p, stok_kodu: e.target.value }))} placeholder="MİLAN ANTRASİT" />
-                </div>
-                <div>
-                  <label className="label">Model Kodu</label>
-                  <input className="input" value={form.model_kodu} onChange={e => setForm(p => ({ ...p, model_kodu: e.target.value }))} placeholder="MİLAN" />
-                </div>
+                <div><label className="label">Stok Kodu *</label><input className="input" value={form.stok_kodu} onChange={e => setForm(p => ({ ...p, stok_kodu: e.target.value }))} placeholder="MİLAN ANTRASİT" /></div>
+                <div><label className="label">Model Kodu</label><input className="input" value={form.model_kodu} onChange={e => setForm(p => ({ ...p, model_kodu: e.target.value }))} placeholder="MİLAN" /></div>
               </div>
-              <div>
-                <label className="label">Ürün Adı *</label>
-                <input className="input" value={form.urun_adi} onChange={e => setForm(p => ({ ...p, urun_adi: e.target.value }))} placeholder="MİLAN TV ÜNİTESİ" />
-              </div>
+              <div><label className="label">Ürün Adı *</label><input className="input" value={form.urun_adi} onChange={e => setForm(p => ({ ...p, urun_adi: e.target.value }))} placeholder="MİLAN TV ÜNİTESİ" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Renk</label>
-                  <input className="input" value={form.renk} onChange={e => setForm(p => ({ ...p, renk: e.target.value }))} placeholder="ANTRASİT" />
-                </div>
-                <div>
-                  <label className="label">Kategori</label>
+                <div><label className="label">Renk</label><input className="input" value={form.renk} onChange={e => setForm(p => ({ ...p, renk: e.target.value }))} placeholder="ANTRASİT" /></div>
+                <div><label className="label">Kategori</label>
                   <select className="input" value={form.kategori} onChange={e => setForm(p => ({ ...p, kategori: e.target.value }))}>
                     {KATEGORILER.map(k => <option key={k}>{k}</option>)}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Barkod</label>
-                  <input className="input" value={form.barkod} onChange={e => setForm(p => ({ ...p, barkod: e.target.value }))} placeholder="757222XXXXXX" />
-                </div>
-                <div>
-                  <label className="label">Satış Fiyatı (₺)</label>
-                  <input type="number" className="input" value={form.fiyat} onChange={e => setForm(p => ({ ...p, fiyat: e.target.value }))} placeholder="0.00" />
-                </div>
+                <div><label className="label">Barkod</label><input className="input" value={form.barkod} onChange={e => setForm(p => ({ ...p, barkod: e.target.value }))} placeholder="757222XXXXXX" /></div>
+                <div><label className="label">Satış Fiyatı (₺)</label><input type="number" className="input" value={form.fiyat} onChange={e => setForm(p => ({ ...p, fiyat: e.target.value }))} placeholder="0.00" /></div>
               </div>
-              <div>
-                <label className="label">Not</label>
-                <textarea className="input" rows={2} value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Ürün notu…" />
-              </div>
+              <div><label className="label">Not</label><textarea className="input" rows={2} value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Ürün notu…" /></div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
               <button className="btn" onClick={() => setModal(null)}>İptal</button>
-              <button className="btn-primary" onClick={kaydet} disabled={kayit}>
-                {kayit ? 'Kaydediliyor…' : (modal === 'yeni' ? 'Ekle' : 'Güncelle')}
-              </button>
+              <button className="btn-primary" onClick={kaydet} disabled={kayit}>{kayit ? 'Kaydediliyor…' : (modal === 'yeni' ? 'Ekle' : 'Güncelle')}</button>
             </div>
           </div>
         </div>
