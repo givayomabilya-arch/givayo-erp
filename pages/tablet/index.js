@@ -88,25 +88,19 @@ export default function Tablet() {
       if (!data.kesim_listesi_url) return alert('Bu ürün için kesim listesi yüklenmemiş')
       window.open(data.kesim_listesi_url, '_blank')
     } else {
-      // Delik projesi - JSON array formatı veya eski tek URL
+      // Delik projesi - jsonb array
       let parcalar = []
       try {
-        if (Array.isArray(data.delik_projesi_url)) {
-          parcalar = data.delik_projesi_url
-        } else if (typeof data.delik_projesi_url === 'string' && data.delik_projesi_url.startsWith('[')) {
-          parcalar = JSON.parse(data.delik_projesi_url)
-        } else if (data.delik_projesi_url) {
-          window.open(data.delik_projesi_url, '_blank')
-          return
-        }
+        if (Array.isArray(data.delik_projesi_url)) parcalar = data.delik_projesi_url
+        else if (typeof data.delik_projesi_url === 'string' && data.delik_projesi_url.startsWith('[')) parcalar = JSON.parse(data.delik_projesi_url)
+        else if (data.delik_projesi_url && typeof data.delik_projesi_url === 'string') { window.open(data.delik_projesi_url, '_blank'); return }
       } catch(e) {}
       
-      const yukluParcalar = parcalar.filter(p => p.url)
+      const yukluParcalar = parcalar.filter(p => p && p.url)
       if (yukluParcalar.length === 0) return alert('Bu ürün için delik projesi yüklenmemiş')
       if (yukluParcalar.length === 1) {
         window.open(yukluParcalar[0].url, '_blank')
       } else {
-        // Birden fazla parça varsa seçim modal aç
         setBelgeModal({ stok_kodu, parcalar: yukluParcalar })
       }
     }
