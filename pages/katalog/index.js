@@ -126,9 +126,8 @@ export default function Katalog() {
     if (!secili) return []
     try {
       if (Array.isArray(secili.delik_projesi_url)) return secili.delik_projesi_url
-      if (typeof secili.delik_projesi_url === 'string' && secili.delik_projesi_url.startsWith('[')) {
-        return JSON.parse(secili.delik_projesi_url)
-      }
+      if (typeof secili.delik_projesi_url === 'string' && secili.delik_projesi_url.startsWith('[')) return JSON.parse(secili.delik_projesi_url)
+      if (secili.delik_projesi_url && typeof secili.delik_projesi_url === 'object') return secili.delik_projesi_url
       if (secili.delik_projesi_url) return [{ ad: 'Delik Projesi', url: secili.delik_projesi_url }]
     } catch (e) {}
     return []
@@ -137,8 +136,8 @@ export default function Katalog() {
   async function delikParcaEkle() {
     const ad = yeniParcaAdi.trim() || `Parça ${delikProjeler().length + 1}`
     const yeniListe = [...delikProjeler(), { ad, url: null }]
-    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
-    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
+    await supabase.from('urunler').update({ delik_projesi_url: yeniListe }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: yeniListe }))
     setYeniParcaAdi('')
   }
 
@@ -152,9 +151,9 @@ export default function Katalog() {
     if (error) { setYukleniyor(p => ({ ...p, [`delik_${idx}`]: false })); return alert('Hata: ' + error.message) }
     const { data: urlData } = supabase.storage.from('uretim-dosyalari').getPublicUrl(dosyaAdi)
     const yeniListe = delikProjeler().map((p, i) => i === idx ? { ...p, url: urlData.publicUrl } : p)
-    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
-    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
-    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: JSON.stringify(yeniListe) } : u))
+    await supabase.from('urunler').update({ delik_projesi_url: yeniListe }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: yeniListe }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: yeniListe } : u))
     setYukleniyor(p => ({ ...p, [`delik_${idx}`]: false }))
     e.target.value = ''
   }
@@ -162,9 +161,9 @@ export default function Katalog() {
   async function delikParcaSil(idx) {
     if (!confirm('Bu parçayı kaldır?')) return
     const yeniListe = delikProjeler().filter((_, i) => i !== idx)
-    await supabase.from('urunler').update({ delik_projesi_url: JSON.stringify(yeniListe) }).eq('id', secili.id)
-    setSecili(prev => ({ ...prev, delik_projesi_url: JSON.stringify(yeniListe) }))
-    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: JSON.stringify(yeniListe) } : u))
+    await supabase.from('urunler').update({ delik_projesi_url: yeniListe }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, delik_projesi_url: yeniListe }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, delik_projesi_url: yeniListe } : u))
   }
 
   const liste = filtreli()
