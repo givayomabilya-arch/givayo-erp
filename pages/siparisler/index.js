@@ -190,14 +190,14 @@ export default function Siparisler() {
       {/* Sekmeler */}
       <div className="flex gap-0 border-b border-gray-800 mb-4">
         <button
-          className={}
+          className={`px-5 py-2.5 text-sm border-b-2 transition-colors ${sekme === 'aktif' ? 'border-blue-500 text-blue-400 font-medium' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
           onClick={() => { setSekme('aktif'); setFiltre(p => ({...p, durum: ''})) }}
         >
           Aktif Siparişler
           <span className="ml-2 badge badge-blue">{siparisler.filter(s => s.durum !== 'tamamlandi').length}</span>
         </button>
         <button
-          className={}
+          className={`px-5 py-2.5 text-sm border-b-2 transition-colors ${sekme === 'tamamlandi' ? 'border-green-500 text-green-400 font-medium' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
           onClick={() => { setSekme('tamamlandi'); setFiltre(p => ({...p, durum: ''})) }}
         >
           Tamamlananlar
