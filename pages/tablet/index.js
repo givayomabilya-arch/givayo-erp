@@ -91,12 +91,16 @@ export default function Tablet() {
       // Delik projesi - jsonb array
       let parcalar = []
       try {
-        if (Array.isArray(data.delik_projesi_url)) parcalar = data.delik_projesi_url
-        else if (typeof data.delik_projesi_url === 'string' && data.delik_projesi_url.startsWith('[')) parcalar = JSON.parse(data.delik_projesi_url)
-        else if (data.delik_projesi_url && typeof data.delik_projesi_url === 'string') { window.open(data.delik_projesi_url, '_blank'); return }
-      } catch(e) {}
+        const raw = data.delik_projesi_url
+        alert('Ham veri tipi: ' + typeof raw + ' | Değer: ' + JSON.stringify(raw).substring(0, 100))
+        if (Array.isArray(raw)) parcalar = raw
+        else if (typeof raw === 'string' && raw.startsWith('[')) parcalar = JSON.parse(raw)
+        else if (raw && typeof raw === 'string') { window.open(raw, '_blank'); return }
+        else if (raw && typeof raw === 'object') parcalar = Object.values(raw)
+      } catch(e) { alert('Parse hatası: ' + e.message) }
       
       const yukluParcalar = parcalar.filter(p => p && p.url)
+      alert('Parça sayısı: ' + parcalar.length + ' | Yüklü: ' + yukluParcalar.length)
       if (yukluParcalar.length === 0) return alert('Bu ürün için delik projesi yüklenmemiş')
       if (yukluParcalar.length === 1) {
         window.open(yukluParcalar[0].url, '_blank')
