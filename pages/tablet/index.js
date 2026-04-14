@@ -23,8 +23,7 @@ export default function Tablet() {
   const [istasyon, setIstasyon] = useState('')
   const [isler, setIsler] = useState([])
   const [loading, setLoading] = useState(false)
-  const [tamamlananlar, setTamamlananlar] = useState({}) // is_id -> parcalar[]
-  const [belge, setBelge] = useState(null)
+  const [tamamlananlar, setTamamlananlar] = useState({})
   const [belgeModal, setBelgeModal] = useState(null)
 
   async function yukle(ist) {
@@ -54,7 +53,6 @@ export default function Tablet() {
       }
     }
 
-    // Tamamlananları yükle
     const { data: tam } = await supabase.from('is_tamamlama').select('*').in('is_emri_id', (emirler || []).map(e => e.id)).eq('istasyon', ist)
     const tamMap = {}
     for (const t of (tam || [])) tamMap[`${t.is_emri_id}-${t.tip}`] = true
@@ -83,27 +81,24 @@ export default function Tablet() {
   async function belgeBak(stok_kodu, tip) {
     const { data } = await supabase.from('urunler').select('kesim_listesi_url,delik_projesi_url,urun_adi').eq('stok_kodu', stok_kodu).single()
     if (!data) return alert('Bu ürün için dosya bulunamadı')
-    
+
     if (tip === 'kesim') {
       if (!data.kesim_listesi_url) return alert('Bu ürün için kesim listesi yüklenmemiş')
       window.open(data.kesim_listesi_url, '_blank')
     } else {
-      // Delik projesi - jsonb array
       let parcalar = []
-      try {
-        const raw = data.delik_projesi_url
-        if (Array.isArray(raw)) {
-          parcalar = raw
-        } else if (raw && typeof raw === 'object') {
-          // Supabase jsonb array obje olarak geliyor
-          parcalar = Object.values(raw)
-        } else if (typeof raw === 'string' && raw.startsWith('[')) {
-          parcalar = JSON.parse(raw)
-        } else if (raw && typeof raw === 'string') {
-          window.open(raw, '_blank'); return
-        }
-      } catch(e) {}
+      const raw = data.delik_projesi_url
+      if (!raw) return alert('Bu ürün için delik projesi yüklenmemiş')
       
+      if (Array.isArray(raw)) {
+        parcalar = raw
+      } else if (typeof raw === 'object') {
+        // Supabase jsonb array'i obje olarak döndürür: {0: {...}, 1: {...}}
+        parcalar = Object.values(raw)
+      } else if (typeof raw === 'string') {
+        try { parcalar = JSON.parse(raw) } catch(e) { window.open(raw, '_blank'); return }
+      }
+
       const yukluParcalar = parcalar.filter(p => p && p.url)
       if (yukluParcalar.length === 0) return alert('Bu ürün için delik projesi yüklenmemiş')
       if (yukluParcalar.length === 1) {
@@ -119,33 +114,21 @@ export default function Tablet() {
 
   return (
     <div className="p-4 max-w-lg mx-auto">
-      {/* Giriş */}
       <div className="card mb-4">
         <label className="label">İstasyon</label>
-        <select
-          className="input"
-          value={istasyon}
-          onChange={e => { setIstasyon(e.target.value); yukle(e.target.value) }}
-        >
+        <select className="input" value={istasyon} onChange={e => { setIstasyon(e.target.value); yukle(e.target.value) }}>
           {ISTASYON_LISTESI.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
         </select>
       </div>
 
       {!istasyon ? (
-        <div className="text-center py-12 text-gray-600">
-          <div className="text-5xl mb-3">📱</div>
-          <div>İstasyonunuzu seçin</div>
-        </div>
+        <div className="text-center py-12 text-gray-600"><div className="text-5xl mb-3">📱</div><div>İstasyonunuzu seçin</div></div>
       ) : loading ? (
         <div className="text-center py-8 text-gray-600">Yükleniyor…</div>
       ) : isler.length === 0 ? (
-        <div className="text-center py-12 text-gray-600">
-          <div className="text-4xl mb-3">✅</div>
-          <div>Bu istasyona atanmış iş yok</div>
-        </div>
+        <div className="text-center py-12 text-gray-600"><div className="text-4xl mb-3">✅</div><div>Bu istasyona atanmış iş yok</div></div>
       ) : (
         <>
-          {/* Header */}
           <div className="flex justify-between items-center mb-3">
             <div className="text-sm font-medium">{ISTASYON_LISTESI.find(i => i.value === istasyon)?.label}</div>
             <span className={`badge ${bekleyen === 0 ? 'badge-green' : 'badge-orange'}`}>
@@ -153,7 +136,6 @@ export default function Tablet() {
             </span>
           </div>
 
-          {/* İş Listesi */}
           <div className="space-y-2">
             {isler.map((g, idx) => {
               const key = `${g.ie_id}-${g.tip}`
@@ -161,16 +143,12 @@ export default function Tablet() {
               return (
                 <div key={idx} className={`card transition-all ${tam ? 'opacity-60' : ''}`}>
                   <div className="flex gap-3">
-                    {/* Checkbox */}
                     <button
-                      className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all mt-0.5 ${
-                        tam ? 'bg-green-700 border-green-600 text-white' : 'border-gray-600 bg-gray-800 hover:border-green-500'
-                      }`}
+                      className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all mt-0.5 ${tam ? 'bg-green-700 border-green-600 text-white' : 'border-gray-600 bg-gray-800 hover:border-green-500'}`}
                       onClick={() => tamamla(g)}
                     >
                       {tam && '✓'}
                     </button>
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="badge badge-gray text-xs">{tipLabel[g.tip]}</span>
@@ -181,13 +159,9 @@ export default function Tablet() {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {g.urunler?.map((u, i) => (
-                          <span key={i} className="text-xs bg-gray-800 text-gray-400 rounded px-1.5 py-0.5">
-                            {u.stok_kodu} ×{u.adet}
-                          </span>
+                          <span key={i} className="text-xs bg-gray-800 text-gray-400 rounded px-1.5 py-0.5">{u.stok_kodu} ×{u.adet}</span>
                         ))}
                       </div>
-
-                      {/* Belge Butonları */}
                       <div className="flex gap-2 mt-2 flex-wrap">
                         {(g.tip === 'ebatlama' || g.tip === 'bantlama') && g.urunler?.map((u, i) => (
                           <button key={i} className="btn btn-sm text-xs" onClick={() => belgeBak(u.stok_kodu, 'kesim')}>
@@ -207,11 +181,38 @@ export default function Tablet() {
             })}
           </div>
 
-          {/* Güncelle butonu */}
           <div className="mt-4 text-center">
             <button className="btn text-sm" onClick={() => yukle(istasyon)}>🔄 Listeyi Yenile</button>
           </div>
         </>
+      )}
+
+      {/* Delik Parça Seçim Modalı */}
+      {belgeModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-sm">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <div>
+                <h2 className="font-medium text-sm">Delik Projesi Seç</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{belgeModal.stok_kodu}</p>
+              </div>
+              <button className="btn btn-sm" onClick={() => setBelgeModal(null)}>✕</button>
+            </div>
+            <div className="p-4 space-y-2">
+              {belgeModal.parcalar.map((p, i) => (
+                <button
+                  key={i}
+                  className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-3 text-left flex items-center gap-3 transition-colors"
+                  onClick={() => { window.open(p.url, '_blank'); setBelgeModal(null) }}
+                >
+                  <span className="text-lg">🔩</span>
+                  <span className="font-medium text-sm">{p.ad || 'Parça ' + (i + 1)}</span>
+                  <span className="ml-auto text-xs text-blue-400">Aç →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
