@@ -11,19 +11,20 @@ const KATEGORILER = [
 
 const bosForm = {
   stok_kodu: '', model_kodu: '', urun_adi: '', renk: '',
-  kategori: 'TV Sehpa & Ünitesi', barkod: '', fiyat: '', not: ''
+  kategori: 'TV Sehpa & Ünitesi', barkod: '', fiyat: '', aciklama: ''
 }
 
 export default function Katalog() {
   const [urunler, setUrunler] = useState([])
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null) // null | 'yeni' | 'duzenle' | 'detay'
+  const [modal, setModal] = useState(null)
   const [secili, setSecili] = useState(null)
   const [form, setForm] = useState(bosForm)
   const [arama, setArama] = useState('')
   const [katFiltre, setKatFiltre] = useState('')
   const [kayit, setKayit] = useState(false)
   const [sayfa, setSayfa] = useState(1)
+  const [yukleniyor, setYukleniyor] = useState({ kesim: false, delik: false })
   const SAYFA = 30
 
   useEffect(() => { yukle() }, [])
@@ -60,7 +61,7 @@ export default function Katalog() {
       kategori: form.kategori,
       barkod: form.barkod?.trim() || null,
       fiyat: parseFloat(form.fiyat) || 0,
-      not: form.not?.trim() || null,
+      aciklama: form.aciklama?.trim() || null,
     }
     let error
     if (modal === 'yeni') {
@@ -91,9 +92,48 @@ export default function Katalog() {
       kategori: u.kategori || 'TV Sehpa & Ünitesi',
       barkod: u.barkod || '',
       fiyat: u.fiyat || '',
-      not: u.not || '',
+      aciklama: u.aciklama || '',
     })
     setModal('duzenle')
+  }
+
+  async function dosyaYukle(e, tip) {
+    const file = e.target.files[0]
+    if (!file || !secili) return
+    setYukleniyor(p => ({ ...p, [tip]: true }))
+
+    const dosyaAdi = `${secili.stok_kodu.replace(/[^a-zA-Z0-9]/g, '_')}_${tip}.${file.name.split('.').pop()}`
+    const { data, error } = await supabase.storage
+      .from('uretim-dosyalari')
+      .upload(dosyaAdi, file, { upsert: true })
+
+    if (error) {
+      setYukleniyor(p => ({ ...p, [tip]: false }))
+      return alert('Yükleme hatası: ' + error.message)
+    }
+
+    const { data: urlData } = supabase.storage.from('uretim-dosyalari').getPublicUrl(dosyaAdi)
+    const url = urlData.publicUrl
+
+    const alan = tip === 'kesim' ? 'kesim_listesi_url' : 'delik_projesi_url'
+    const { error: updateError } = await supabase.from('urunler').update({ [alan]: url }).eq('id', secili.id)
+
+    if (!updateError) {
+      setSecili(prev => ({ ...prev, [alan]: url }))
+      setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, [alan]: url } : u))
+    }
+
+    setYukleniyor(p => ({ ...p, [tip]: false }))
+    e.target.value = ''
+  }
+
+  async function dosyaSil(tip) {
+    if (!secili) return
+    if (!confirm('Bu dosyayı kaldır?')) return
+    const alan = tip === 'kesim' ? 'kesim_listesi_url' : 'delik_projesi_url'
+    await supabase.from('urunler').update({ [alan]: null }).eq('id', secili.id)
+    setSecili(prev => ({ ...prev, [alan]: null }))
+    setUrunler(prev => prev.map(u => u.id === secili.id ? { ...u, [alan]: null } : u))
   }
 
   const liste = filtreli()
@@ -102,7 +142,6 @@ export default function Katalog() {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-5">
         <div>
           <h1 className="text-xl font-semibold">Ürün Kataloğu</h1>
@@ -113,41 +152,23 @@ export default function Katalog() {
         </button>
       </div>
 
-      {/* Filtreler */}
       <div className="flex gap-3 mb-4 flex-wrap">
-        <input
-          className="input w-64"
-          placeholder="Stok kodu, ürün adı, renk ara…"
-          value={arama}
-          onChange={e => { setArama(e.target.value); setSayfa(1) }}
-        />
-        <select
-          className="input w-52"
-          value={katFiltre}
-          onChange={e => { setKatFiltre(e.target.value); setSayfa(1) }}
-        >
+        <input className="input w-64" placeholder="Stok kodu, ürün adı, renk ara…" value={arama} onChange={e => { setArama(e.target.value); setSayfa(1) }} />
+        <select className="input w-52" value={katFiltre} onChange={e => { setKatFiltre(e.target.value); setSayfa(1) }}>
           <option value="">Tüm Kategoriler</option>
           {KATEGORILER.map(k => <option key={k}>{k}</option>)}
         </select>
         <span className="text-xs text-gray-500 self-center">{liste.length} sonuç</span>
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="text-center py-12 text-gray-600">Yükleniyor…</div>
       ) : sayfalanan.length === 0 ? (
-        <div className="text-center py-12 text-gray-600">
-          <div className="text-4xl mb-3">🗂️</div>
-          <div>Ürün bulunamadı</div>
-        </div>
+        <div className="text-center py-12 text-gray-600"><div className="text-4xl mb-3">🗂️</div><div>Ürün bulunamadı</div></div>
       ) : (
         <div className="grid grid-cols-3 gap-3 xl:grid-cols-4">
           {sayfalanan.map(u => (
-            <div
-              key={u.id}
-              className="card hover:border-gray-600 cursor-pointer transition-colors"
-              onClick={() => { setSecili(u); setModal('detay') }}
-            >
+            <div key={u.id} className="card hover:border-gray-600 cursor-pointer transition-colors" onClick={() => { setSecili(u); setModal('detay') }}>
               <div className="flex justify-between items-start mb-2">
                 <span className="text-xs text-gray-500 font-mono">{u.stok_kodu}</span>
                 {u.kesim_listesi_url || u.delik_projesi_url ? (
@@ -169,16 +190,13 @@ export default function Katalog() {
         </div>
       )}
 
-      {/* Pagination */}
       {toplamSayfa > 1 && (
         <div className="flex items-center justify-center gap-2 mt-6">
           <button className="btn btn-sm" onClick={() => setSayfa(p => Math.max(1, p - 1))} disabled={sayfa === 1}>‹</button>
           {Array.from({ length: Math.min(toplamSayfa, 7) }, (_, i) => {
             const p = sayfa <= 4 ? i + 1 : i + sayfa - 3
             if (p > toplamSayfa) return null
-            return (
-              <button key={p} className={`btn btn-sm ${p === sayfa ? 'btn-primary' : ''}`} onClick={() => setSayfa(p)}>{p}</button>
-            )
+            return <button key={p} className={`btn btn-sm ${p === sayfa ? 'btn-primary' : ''}`} onClick={() => setSayfa(p)}>{p}</button>
           })}
           <button className="btn btn-sm" onClick={() => setSayfa(p => Math.min(toplamSayfa, p + 1))} disabled={sayfa === toplamSayfa}>›</button>
           <span className="text-xs text-gray-500">{sayfa}/{toplamSayfa}</span>
@@ -188,7 +206,7 @@ export default function Katalog() {
       {/* Detay Modal */}
       {modal === 'detay' && secili && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-4 border-b border-gray-800">
               <h2 className="font-medium">{secili.stok_kodu}</h2>
               <button className="btn btn-sm" onClick={() => setModal(null)}>✕</button>
@@ -202,20 +220,67 @@ export default function Katalog() {
                 <div><div className="text-xs text-gray-500 mb-1">FİYAT</div><div className="text-blue-400 font-medium">₺{(secili.fiyat || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</div></div>
                 <div><div className="text-xs text-gray-500 mb-1">MODEL</div><div>{secili.model_kodu || '—'}</div></div>
               </div>
-              {secili.not && (
-                <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-400">{secili.not}</div>
-              )}
+
+              {/* Üretim Dosyaları */}
               <div className="border-t border-gray-800 pt-3">
-                <div className="text-xs text-gray-500 mb-2">ÜRETİM DOSYALARI</div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {secili.kesim_listesi_url
-                    ? <a href={secili.kesim_listesi_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-green-900/40 text-green-300 rounded-lg p-2 text-xs hover:bg-green-900/60">📄 Kesim Listesi</a>
-                    : <div className="flex items-center gap-2 bg-gray-800 text-gray-500 rounded-lg p-2 text-xs">📄 Kesim Listesi Yok</div>
-                  }
-                  {secili.delik_projesi_url
-                    ? <a href={secili.delik_projesi_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-green-900/40 text-green-300 rounded-lg p-2 text-xs hover:bg-green-900/60">🔩 Delik Projesi</a>
-                    : <div className="flex items-center gap-2 bg-gray-800 text-gray-500 rounded-lg p-2 text-xs">🔩 Delik Projesi Yok</div>
-                  }
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">ÜRETİM DOSYALARI</div>
+
+                {/* Kesim Listesi */}
+                <div className="bg-gray-800 rounded-lg p-3 mb-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">📄 Kesim Listesi</span>
+                    {secili.kesim_listesi_url && (
+                      <span className="badge badge-green text-xs">Yüklendi ✓</span>
+                    )}
+                  </div>
+                  {secili.kesim_listesi_url ? (
+                    <div className="flex gap-2">
+                      <a href={secili.kesim_listesi_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">
+                        📥 İndir / Görüntüle
+                      </a>
+                      <button className="btn btn-sm btn-danger text-xs" onClick={() => dosyaSil('kesim')}>Kaldır</button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 border border-dashed border-gray-600 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-950/20 transition-colors">
+                      {yukleniyor.kesim ? (
+                        <span className="text-xs text-gray-400">Yükleniyor…</span>
+                      ) : (
+                        <>
+                          <span className="text-xs text-gray-400">📤 Kesim listesi yükle (.xlsx, .pdf)</span>
+                          <input type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={e => dosyaYukle(e, 'kesim')} />
+                        </>
+                      )}
+                    </label>
+                  )}
+                </div>
+
+                {/* Delik Projesi */}
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">🔩 Delik Projesi</span>
+                    {secili.delik_projesi_url && (
+                      <span className="badge badge-green text-xs">Yüklendi ✓</span>
+                    )}
+                  </div>
+                  {secili.delik_projesi_url ? (
+                    <div className="flex gap-2">
+                      <a href={secili.delik_projesi_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-success flex-1 text-center text-xs">
+                        📥 İndir / Görüntüle
+                      </a>
+                      <button className="btn btn-sm btn-danger text-xs" onClick={() => dosyaSil('delik')}>Kaldır</button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 border border-dashed border-gray-600 rounded-lg p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-950/20 transition-colors">
+                      {yukleniyor.delik ? (
+                        <span className="text-xs text-gray-400">Yükleniyor…</span>
+                      ) : (
+                        <>
+                          <span className="text-xs text-gray-400">📤 Delik projesi yükle (.pdf)</span>
+                          <input type="file" accept=".pdf,.dwg,.dxf" className="hidden" onChange={e => dosyaYukle(e, 'delik')} />
+                        </>
+                      )}
+                    </label>
+                  )}
                 </div>
               </div>
             </div>
@@ -277,7 +342,7 @@ export default function Katalog() {
               </div>
               <div>
                 <label className="label">Not</label>
-                <textarea className="input" rows={2} value={form.not} onChange={e => setForm(p => ({ ...p, not: e.target.value }))} placeholder="Ürün notu…" />
+                <textarea className="input" rows={2} value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Ürün notu…" />
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
