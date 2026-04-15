@@ -24,7 +24,6 @@ export default function Siparisler() {
   const [kayit, setKayit] = useState(false)
   const fileRef = useRef()
 
-
   useEffect(() => { yukle() }, [])
 
   async function yukle() {
@@ -308,13 +307,17 @@ export default function Siparisler() {
                   <td className="td">{durumBadge(s.durum)}</td>
                   <td className="td text-xs text-gray-500">{new Date(s.created_at).toLocaleDateString('tr-TR')}</td>
                   <td className="td">
-                    <select
-                      className="text-xs bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-gray-300"
-                      value={s.durum}
-                      onChange={e => durumGuncelle(s.id, e.target.value)}
-                    >
-                      {DURUMLAR.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                    </select>
+                    <div className="flex gap-1 items-center">
+                      <select
+                        className="text-xs bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-gray-300"
+                        value={s.durum}
+                        onChange={e => durumGuncelle(s.id, e.target.value)}
+                      >
+                        {DURUMLAR.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                      </select>
+                      <button className="btn btn-sm text-xs" onClick={() => detayAc(s)}>✏️</button>
+                      <button className="btn btn-sm text-xs text-red-400" onClick={() => siparissSil(s.id)}>🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
