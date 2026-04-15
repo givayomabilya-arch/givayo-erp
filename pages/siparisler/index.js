@@ -22,7 +22,6 @@ export default function Siparisler() {
   const [form, setForm] = useState({})
   const [excelOnizleme, setExcelOnizleme] = useState([])
   const [kayit, setKayit] = useState(false)
-  const [secili, setSecili] = useState(null)
   const fileRef = useRef()
 
   useEffect(() => { yukle() }, [])
