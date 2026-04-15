@@ -19,12 +19,20 @@ const ISTASYON_LISTESI = [
   { value: 'Paketçi 3', label: 'Paketçi 3' },
 ]
 
-export default function Tablet() {
+export default function Tablet({ profil }) {
   const [istasyon, setIstasyon] = useState('')
   const [isler, setIsler] = useState([])
   const [loading, setLoading] = useState(false)
   const [tamamlananlar, setTamamlananlar] = useState({})
   const [belgeModal, setBelgeModal] = useState(null)
+
+  // Eleman ise kendi istasyonunu otomatik yükle
+  useEffect(() => {
+    if (profil?.rol === 'eleman' && profil?.istasyon) {
+      setIstasyon(profil.istasyon)
+      yukle(profil.istasyon)
+    }
+  }, [profil])
 
   async function yukle(ist) {
     if (!ist) { setIsler([]); return }
@@ -114,12 +122,22 @@ export default function Tablet() {
 
   return (
     <div className="p-4 max-w-lg mx-auto">
-      <div className="card mb-4">
-        <label className="label">İstasyon</label>
-        <select className="input" value={istasyon} onChange={e => { setIstasyon(e.target.value); yukle(e.target.value) }}>
-          {ISTASYON_LISTESI.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
-        </select>
-      </div>
+      {profil?.rol !== 'eleman' && (
+        <div className="card mb-4">
+          <label className="label">İstasyon</label>
+          <select className="input" value={istasyon} onChange={e => { setIstasyon(e.target.value); yukle(e.target.value) }}>
+            {ISTASYON_LISTESI.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+          </select>
+        </div>
+      )}
+      {profil?.rol === 'eleman' && istasyon && (
+        <div className="card mb-4 flex justify-between items-center">
+          <div>
+            <div className="text-xs text-gray-500 mb-0.5">İstasyonunuz</div>
+            <div className="font-medium text-blue-400">{istasyon}</div>
+          </div>
+        </div>
+      )}
 
       {!istasyon ? (
         <div className="text-center py-12 text-gray-600"><div className="text-5xl mb-3">📱</div><div>İstasyonunuzu seçin</div></div>
