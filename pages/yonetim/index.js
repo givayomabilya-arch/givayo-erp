@@ -46,15 +46,20 @@ export default function Yonetim({ profil }) {
     if (form.sifre.length < 6) return setHata('Şifre en az 6 karakter olmalı')
     setKayit(true); setHata('')
 
-    const { error } = await supabase.rpc('create_auth_user', {
-      p_email: form.email,
-      p_password: form.sifre,
-      p_ad_soyad: form.ad_soyad,
-      p_rol: form.rol,
-      p_istasyon: form.istasyon || null
+    const res = await fetch('/api/create-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.sifre,
+        ad_soyad: form.ad_soyad,
+        rol: form.rol,
+        istasyon: form.istasyon || null
+      })
     })
+    const data = await res.json()
 
-    if (error) { setHata('Hata: ' + error.message); setKayit(false); return }
+    if (!res.ok) { setHata('Hata: ' + data.error); setKayit(false); return }
 
     setKayit(false); setModal(null)
     setForm({ email: '', ad_soyad: '', sifre: '', rol: 'eleman', istasyon: '' })
@@ -78,9 +83,10 @@ export default function Yonetim({ profil }) {
 
     // Şifre değiştirildiyse
     if (form.sifre && form.sifre.length >= 6) {
-      await supabase.rpc('update_user_password', {
-        p_user_id: secili.id,
-        p_password: form.sifre
+      await fetch('/api/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: secili.id, password: form.sifre })
       })
     }
 
