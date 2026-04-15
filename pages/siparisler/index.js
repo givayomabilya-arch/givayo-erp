@@ -24,6 +24,7 @@ export default function Siparisler() {
   const [kayit, setKayit] = useState(false)
   const fileRef = useRef()
 
+
   useEffect(() => { yukle() }, [])
 
   async function yukle() {
