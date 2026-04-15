@@ -243,7 +243,9 @@ export default function Siparisler() {
       <div className="flex justify-between items-center mb-5">
         <div>
           <h1 className="text-xl font-semibold">Siparişler</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{siparisler.length} sipariş</p>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {siparisler.length} sipariş · toplam <span className="text-blue-400 font-medium">{siparisler.filter(s => s.durum !== 'tamamlandi').reduce((t, s) => t + (s.adet || 0), 0)} adet</span> aktif
+          </p>
         </div>
         <div className="flex gap-2">
           <label className="btn cursor-pointer flex items-center gap-2">
