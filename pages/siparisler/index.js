@@ -22,6 +22,7 @@ export default function Siparisler() {
   const [form, setForm] = useState({})
   const [excelOnizleme, setExcelOnizleme] = useState([])
   const [kayit, setKayit] = useState(false)
+  const [secili, setSecili] = useState(null)
   const fileRef = useRef()
 
   useEffect(() => { yukle() }, [])
@@ -161,6 +162,47 @@ export default function Siparisler() {
     setSiparisler(prev => prev.map(s => s.id === id ? { ...s, durum } : s))
   }
 
+  async function siparissSil(id) {
+    if (!confirm('Bu siparişi silmek istediğinize emin misiniz?')) return
+    await supabase.from('siparisler').delete().eq('id', id)
+    setSiparisler(prev => prev.filter(s => s.id !== id))
+    setModal(null)
+  }
+
+  function detayAc(s) {
+    setSecili(s)
+    setForm({
+      musteri_adi: s.musteri_adi || '',
+      musteri_telefon: s.musteri_telefon || '',
+      teslimat_adresi: s.teslimat_adresi || '',
+      urun_stok_kodu: s.urun_stok_kodu || '',
+      adet: s.adet || 1,
+      birim_fiyat: s.birim_fiyat || '',
+      not: s.aciklama || '',
+      platform: s.platform || 'Manuel',
+      durum: s.durum || 'beklemede',
+    })
+    setModal('detay')
+  }
+
+  async function siparisDuzenle() {
+    if (!form.musteri_adi || !form.urun_stok_kodu) return alert('Müşteri ve ürün zorunlu')
+    const { error } = await supabase.from('siparisler').update({
+      musteri_adi: form.musteri_adi,
+      musteri_telefon: form.musteri_telefon || null,
+      teslimat_adresi: form.teslimat_adresi || null,
+      urun_stok_kodu: form.urun_stok_kodu,
+      adet: parseInt(form.adet) || 1,
+      birim_fiyat: parseFloat(form.birim_fiyat) || 0,
+      aciklama: form.not || null,
+      platform: form.platform,
+      durum: form.durum,
+    }).eq('id', secili.id)
+    if (error) return alert('Hata: ' + error.message)
+    setModal(null)
+    yukle()
+  }
+
   const durumBadge = (d) => {
     const item = DURUMLAR.find(x => x.value === d)
     return <span className={`badge ${item?.cls || 'badge-gray'}`}>{item?.label || d}</span>
@@ -280,6 +322,71 @@ export default function Siparisler() {
           </table>
         )}
       </div>
+
+      {/* Detay / Düzenle Modal */}
+      {modal === 'detay' && secili && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg max-h-screen overflow-y-auto">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <h2 className="font-medium">Sipariş Düzenle — {secili.siparis_no}</h2>
+              <button className="btn btn-sm" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Platform</label>
+                  <select className="input" value={form.platform} onChange={e => setForm(p => ({ ...p, platform: e.target.value }))}>
+                    {PLATFORMLAR.map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Durum</label>
+                  <select className="input" value={form.durum} onChange={e => setForm(p => ({ ...p, durum: e.target.value }))}>
+                    {DURUMLAR.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Müşteri Adı *</label>
+                <input className="input" value={form.musteri_adi} onChange={e => setForm(p => ({ ...p, musteri_adi: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Telefon</label>
+                <input className="input" value={form.musteri_telefon} onChange={e => setForm(p => ({ ...p, musteri_telefon: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Teslimat Adresi</label>
+                <textarea className="input" rows={2} value={form.teslimat_adresi} onChange={e => setForm(p => ({ ...p, teslimat_adresi: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Ürün Stok Kodu *</label>
+                  <input className="input" value={form.urun_stok_kodu} onChange={e => setForm(p => ({ ...p, urun_stok_kodu: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="label">Adet</label>
+                  <input type="number" className="input" value={form.adet} onChange={e => setForm(p => ({ ...p, adet: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Birim Fiyat (₺)</label>
+                <input type="number" className="input" value={form.birim_fiyat} onChange={e => setForm(p => ({ ...p, birim_fiyat: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Not</label>
+                <textarea className="input" rows={2} value={form.not} onChange={e => setForm(p => ({ ...p, not: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-between p-4 border-t border-gray-800">
+              <button className="btn-danger btn-sm" onClick={() => siparissSil(secili.id)}>Siparişi Sil</button>
+              <div className="flex gap-2">
+                <button className="btn" onClick={() => setModal(null)}>İptal</button>
+                <button className="btn-primary" onClick={siparisDuzenle}>Kaydet</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manuel Sipariş Modal */}
       {modal === 'manuel' && (
