@@ -22,6 +22,7 @@ export default function Siparisler() {
   const [form, setForm] = useState({})
   const [excelOnizleme, setExcelOnizleme] = useState([])
   const [kayit, setKayit] = useState(false)
+  const [seciliSiparisler, setSeciliSiparisler] = useState([])
   const fileRef = useRef()
 
   useEffect(() => { yukle() }, [])
@@ -202,6 +203,33 @@ export default function Siparisler() {
     yukle()
   }
 
+  function toggleSecili(id) {
+    setSeciliSiparisler(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function tumunuSec() {
+    if (seciliSiparisler.length === liste.length) {
+      setSeciliSiparisler([])
+    } else {
+      setSeciliSiparisler(liste.map(s => s.id))
+    }
+  }
+
+  async function topluSil() {
+    if (!seciliSiparisler.length) return
+    if (!confirm(`${seciliSiparisler.length} siparişi silmek istediğinize emin misiniz?`)) return
+    await supabase.from('siparisler').delete().in('id', seciliSiparisler)
+    setSeciliSiparisler([])
+    yukle()
+  }
+
+  async function topluDurumGuncelle(durum) {
+    if (!seciliSiparisler.length) return
+    await supabase.from('siparisler').update({ durum }).in('id', seciliSiparisler)
+    setSeciliSiparisler([])
+    yukle()
+  }
+
   const durumBadge = (d) => {
     const item = DURUMLAR.find(x => x.value === d)
     return <span className={`badge ${item?.cls || 'badge-gray'}`}>{item?.label || d}</span>
@@ -265,6 +293,29 @@ export default function Siparisler() {
         <span className="text-xs text-gray-500 self-center">{liste.length} sonuç</span>
       </div>
 
+      {/* Toplu İşlem Barı */}
+      {seciliSiparisler.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 p-3 bg-blue-950/40 border border-blue-800 rounded-xl flex-wrap">
+          <span className="text-sm text-blue-300 font-medium">{seciliSiparisler.length} sipariş seçili</span>
+          <div className="flex gap-2 flex-wrap">
+            <select
+              className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-300"
+              defaultValue=""
+              onChange={e => { if(e.target.value) { topluDurumGuncelle(e.target.value); e.target.value = '' } }}
+            >
+              <option value="" disabled>Durumu Değiştir…</option>
+              {DURUMLAR.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+            <button className="btn btn-sm text-xs text-red-400 border-red-800 hover:bg-red-950" onClick={topluSil}>
+              🗑️ Toplu Sil
+            </button>
+            <button className="btn btn-sm text-xs" onClick={() => setSeciliSiparisler([])}>
+              ✕ Seçimi Kaldır
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tablo */}
       <div className="card overflow-x-auto">
         {loading ? (
@@ -278,6 +329,12 @@ export default function Siparisler() {
           <table className="w-full">
             <thead>
               <tr>
+                <th className="th w-8">
+                  <input type="checkbox" className="accent-blue-500"
+                    checked={seciliSiparisler.length === liste.length && liste.length > 0}
+                    onChange={tumunuSec}
+                  />
+                </th>
                 <th className="th">Sipariş No</th>
                 <th className="th">Platform</th>
                 <th className="th">Müşteri</th>
@@ -291,7 +348,13 @@ export default function Siparisler() {
             </thead>
             <tbody>
               {liste.map(s => (
-                <tr key={s.id} className="hover:bg-gray-800/40">
+                <tr key={s.id} className={`hover:bg-gray-800/40 ${seciliSiparisler.includes(s.id) ? 'bg-blue-950/20' : ''}`}>
+                  <td className="td">
+                    <input type="checkbox" className="accent-blue-500"
+                      checked={seciliSiparisler.includes(s.id)}
+                      onChange={() => toggleSecili(s.id)}
+                    />
+                  </td>
                   <td className="td font-mono text-xs text-blue-400">{s.siparis_no}</td>
                   <td className="td">
                     <span className={`badge ${s.platform === 'Trendyol' ? 'badge-blue' : s.platform === 'Hepsiburada' ? 'badge-orange' : 'badge-gray'}`}>
