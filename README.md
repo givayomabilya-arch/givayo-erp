@@ -1,5 +1,5 @@
 # GİVAYO ERP — Kurulum Rehberi
-
+ 
 ## Adım 1: Supabase
 
 1. **supabase.com** → "Start your project" → GitHub ile giriş
