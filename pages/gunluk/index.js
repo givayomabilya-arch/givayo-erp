@@ -282,24 +282,66 @@ export default function GunlukPlan({ profil }) {
   )
 }
 
+const MAX_PARCA = 12
+
+function ParcaSecici({ secili, onChange }) {
+  const tumSecili = secili.length === MAX_PARCA
+
+  function toggleTum() {
+    if (tumSecili) onChange([])
+    else onChange(Array.from({ length: MAX_PARCA }, (_, i) => i + 1))
+  }
+
+  function toggleParca(n) {
+    if (secili.includes(n)) onChange(secili.filter(x => x !== n))
+    else onChange([...secili, n].sort((a, b) => a - b))
+  }
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-2">
+      <label className="flex items-center gap-2 cursor-pointer mb-2 pb-2 border-b border-gray-700">
+        <input type="checkbox" className="accent-blue-500" checked={tumSecili} onChange={toggleTum} />
+        <span className="text-sm font-medium text-gray-200">Tüm Parçalar</span>
+      </label>
+      <div className="grid grid-cols-6 gap-1">
+        {Array.from({ length: MAX_PARCA }, (_, i) => i + 1).map(n => (
+          <label key={n} className="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" className="accent-blue-500" checked={secili.includes(n)} onChange={() => toggleParca(n)} />
+            <span className="text-xs text-gray-300">{n}</span>
+          </label>
+        ))}
+      </div>
+      {secili.length > 0 && !tumSecili && (
+        <div className="text-xs text-blue-400 mt-1">Seçili: {secili.join(', ')}</div>
+      )}
+    </div>
+  )
+}
+
 function AtamaBlok({ baslik, satirlar, istasyonlar, onEkle, onSil, onGuncelle }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
         <div className="text-xs text-gray-400 uppercase tracking-wide">{baslik}</div>
-        <button className="btn btn-sm text-xs" onClick={onEkle}>+ Satır</button>
+        <button className="btn btn-sm text-xs" onClick={onEkle}>+ Satır Ekle</button>
       </div>
       {satirlar.map((s, i) => (
-        <div key={i} className="flex gap-2 mb-2">
-          <select className="input" value={s.parcalar} onChange={e => onGuncelle(i, 'parcalar', e.target.value)}>
-            {['Tüm parçalar', 'Parçalar 1–3', 'Parçalar 4–6', 'Parçalar 7–8', 'Parçalar 1–4', 'Parçalar 5–8'].map(p => <option key={p}>{p}</option>)}
-          </select>
-          <select className="input" value={s.istasyon} onChange={e => onGuncelle(i, 'istasyon', e.target.value)}>
-            {istasyonlar.map(ist => <option key={ist}>{ist}</option>)}
-          </select>
-          {satirlar.length > 1 && (
-            <button className="btn btn-sm btn-danger shrink-0" onClick={() => onSil(i)}>✕</button>
-          )}
+        <div key={i} className="mb-3 bg-gray-800/50 rounded-lg p-2">
+          <div className="flex gap-2 mb-2 items-center">
+            <select className="input flex-1" value={s.istasyon} onChange={e => onGuncelle(i, 'istasyon', e.target.value)}>
+              {istasyonlar.map(ist => <option key={ist}>{ist}</option>)}
+            </select>
+            {satirlar.length > 1 && (
+              <button className="btn btn-sm text-red-400 shrink-0" onClick={() => onSil(i)}>✕</button>
+            )}
+          </div>
+          <ParcaSecici
+            secili={s.parcalar === 'Tüm parçalar' || !s.parcalar
+              ? Array.from({ length: MAX_PARCA }, (_, j) => j + 1)
+              : (Array.isArray(s.parcalar) ? s.parcalar : [])
+            }
+            onChange={v => onGuncelle(i, 'parcalar', v.length === MAX_PARCA ? 'Tüm parçalar' : v)}
+          />
         </div>
       ))}
     </div>
