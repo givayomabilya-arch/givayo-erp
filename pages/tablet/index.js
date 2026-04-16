@@ -25,6 +25,7 @@ export default function Tablet({ profil }) {
   const [loading, setLoading] = useState(false)
   const [tamamlananlar, setTamamlananlar] = useState({})
   const [belgeModal, setBelgeModal] = useState(null)
+  const [sekme, setSekme] = useState('bekleyen')
 
   // Eleman ise kendi istasyonunu otomatik yükle
   useEffect(() => {
@@ -155,7 +156,7 @@ export default function Tablet({ profil }) {
           </div>
 
           <div className="space-y-2">
-            {isler.map((g, idx) => {
+            {isler.filter(g => sekme === 'bekleyen' ? !tamamlananlar[`${g.ie_id}-${g.tip}`] : !!tamamlananlar[`${g.ie_id}-${g.tip}`]).map((g, idx) => {
               const key = `${g.ie_id}-${g.tip}`
               const tam = !!tamamlananlar[key]
               return (
