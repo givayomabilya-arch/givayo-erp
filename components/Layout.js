@@ -15,7 +15,6 @@ const ROL_MENULERI = {
   ],
   foremen: [
     { href: '/', label: 'Dashboard', icon: '📊' },
-    { href: '/uretim', label: 'Üretim Planı', icon: '🏭' },
     { href: '/katalog', label: 'Katalog', icon: '🗂️' },
     { href: '/gunluk', label: 'Günlük Plan', icon: '📅' },
   ],
