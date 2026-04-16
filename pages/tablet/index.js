@@ -75,6 +75,7 @@ export default function Tablet({ profil }) {
     const key = `${gorev.ie_id}-${gorev.tip}`
     const yeniDurum = !tamamlananlar[key]
     setTamamlananlar(p => ({ ...p, [key]: yeniDurum }))
+
     if (yeniDurum) {
       await supabase.from('is_tamamlama').upsert({
         is_emri_id: gorev.ie_id,
@@ -82,6 +83,25 @@ export default function Tablet({ profil }) {
         tip: gorev.tip,
         tamamlandi_at: new Date().toISOString(),
       }, { onConflict: 'is_emri_id,istasyon,tip' })
+
+      // Bu iş emrindeki tüm istasyonlar tamamlandı mı kontrol et
+      const { data: ie } = await supabase.from('is_emirleri').select('atamalar').eq('id', gorev.ie_id).single()
+      if (ie) {
+        const { data: tamam } = await supabase.from('is_tamamlama').select('istasyon,tip').eq('is_emri_id', gorev.ie_id)
+        const atamalar = ie.atamalar || {}
+
+        // Toplam atanan istasyon sayısını hesapla
+        let toplamAtama = 0
+        for (const [tip, deger] of Object.entries(atamalar)) {
+          if (Array.isArray(deger)) toplamAtama += deger.length
+          else if (deger) toplamAtama += 1
+        }
+
+        if ((tamam || []).length >= toplamAtama && toplamAtama > 0) {
+          // Tüm istasyonlar tamamlandı — iş emrini kapat
+          await supabase.from('is_emirleri').update({ durum: 'tamamlandi' }).eq('id', gorev.ie_id)
+        }
+      }
     } else {
       await supabase.from('is_tamamlama').delete().eq('is_emri_id', gorev.ie_id).eq('istasyon', istasyon).eq('tip', gorev.tip)
     }
