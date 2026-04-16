@@ -274,6 +274,15 @@ export default function Siparisler() {
           Tamamlananlar
           <span className="ml-2 badge badge-green">{siparisler.filter(s => s.durum === 'tamamlandi').length}</span>
         </button>
+        <button
+          className={`px-5 py-2.5 text-sm border-b-2 transition-colors ${sekme === 'ozet' ? 'border-purple-500 text-purple-400 font-medium' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+          onClick={() => { setSekme('ozet'); setFiltre(p => ({...p, durum: ''})) }}
+        >
+          Ürün Özeti
+          <span className="ml-2 badge" style={{background:'#3b0764',color:'#d8b4fe'}}>
+            {[...new Set(siparisler.filter(s=>s.durum!=='tamamlandi').map(s=>s.urun_stok_kodu))].length}
+          </span>
+        </button>
       </div>
 
       {/* Filtreler */}
@@ -294,6 +303,53 @@ export default function Siparisler() {
         </select>
         <span className="text-xs text-gray-500 self-center">{liste.length} sonuç</span>
       </div>
+
+      {/* Ürün Özeti Sekmesi */}
+      {sekme === 'ozet' && (
+        <div className="card overflow-x-auto">
+          {(() => {
+            const aktifSiparisler = siparisler.filter(s => s.durum !== 'tamamlandi')
+            const gruplar = {}
+            for (const s of aktifSiparisler) {
+              if (!gruplar[s.urun_stok_kodu]) gruplar[s.urun_stok_kodu] = { stok: s.urun_stok_kodu, adet: 0, musteri: 0 }
+              gruplar[s.urun_stok_kodu].adet += s.adet || 0
+              gruplar[s.urun_stok_kodu].musteri++
+            }
+            const liste = Object.values(gruplar).sort((a,b) => b.adet - a.adet)
+            const toplamAdet = liste.reduce((t, g) => t + g.adet, 0)
+            return (
+              <>
+                <div className="flex justify-between items-center mb-3 px-1">
+                  <span className="text-sm text-gray-400">{liste.length} farklı ürün</span>
+                  <span className="text-sm font-medium text-blue-400">Toplam: {toplamAdet} adet</span>
+                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="th">Ürün (Stok Kodu)</th>
+                      <th className="th text-center">Müşteri Sayısı</th>
+                      <th className="th text-center">Toplam Adet</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liste.map(g => (
+                      <tr key={g.stok} className="hover:bg-gray-800/40">
+                        <td className="td font-medium text-gray-200">{g.stok}</td>
+                        <td className="td text-center text-gray-400">{g.musteri} müşteri</td>
+                        <td className="td text-center">
+                          <span className="badge badge-blue text-sm font-bold">{g.adet}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )
+          })()}
+        </div>
+      )}
+
+      {sekme !== 'ozet' && <>
 
       {/* Toplu İşlem Barı */}
       {seciliSiparisler.length > 0 && (
@@ -578,6 +634,8 @@ export default function Siparisler() {
           </div>
         </div>
       )}
+    </>
+    }
     </div>
   )
 }
