@@ -13,6 +13,70 @@ const ISTASYONLAR = {
 
 const PARCA_GRUPLARI = ['Tüm parçalar', 'Parçalar 1–3', 'Parçalar 4–6', 'Parçalar 7–8', 'Parçalar 1–4', 'Parçalar 5–8']
 
+function IsEmriKart({ ie }) {
+  const [tamamlananlar, setTamamlananlar] = useState([])
+  const [yuklendi, setYuklendi] = useState(false)
+
+  useEffect(() => {
+    async function yukle() {
+      const { data } = await supabase.from('is_tamamlama').select('istasyon,tip').eq('is_emri_id', ie.id)
+      setTamamlananlar(data || [])
+      setYuklendi(true)
+    }
+    yukle()
+  }, [ie.id])
+
+  // Tüm atanmış istasyonları listele
+  const istasyonlar = []
+  const atamalar = ie.atamalar || {}
+  
+  for (const [tip, deger] of Object.entries(atamalar)) {
+    if (tip === 'aksesuar' || tip === 'kartoncu') {
+      if (deger) istasyonlar.push({ istasyon: deger, tip })
+    } else if (Array.isArray(deger)) {
+      for (const s of deger) {
+        if (s.istasyon) istasyonlar.push({ istasyon: s.istasyon, tip })
+      }
+    }
+  }
+
+  function durum(ist, tip) {
+    const tamam = tamamlananlar.some(t => t.istasyon === ist && t.tip === tip)
+    if (ie.durum === 'tamamlandi') return 'mavi'
+    return tamam ? 'yesil' : 'kirmizi'
+  }
+
+  const renkler = {
+    kirmizi: 'bg-red-500',
+    yesil: 'bg-green-500',
+    mavi: 'bg-blue-500',
+  }
+
+  return (
+    <div className="card">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-medium text-blue-300 font-mono">{ie.is_emri_no}</span>
+        <span className={`badge ${ie.durum === 'tamamlandi' ? 'badge-green' : 'badge-orange'}`}>
+          {ie.durum === 'tamamlandi' ? 'Tamamlandı' : 'Aktif'}
+        </span>
+      </div>
+      <div className="text-xs text-gray-500 mb-2">
+        {ie.urun_listesi?.map(u => `${u.stok_kodu} ×${u.adet}`).join(' · ')}
+      </div>
+      {yuklendi && (
+        <div className="flex flex-wrap gap-1.5">
+          {istasyonlar.map((ist, i) => (
+            <div key={i} className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-0.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${renkler[durum(ist.istasyon, ist.tip)]}`}></span>
+              <span className="text-xs text-gray-300">{ist.istasyon}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GunlukPlan({ profil }) {
   const router = useRouter()
   const [planlar, setPlanlar] = useState([])
@@ -186,19 +250,10 @@ export default function GunlukPlan({ profil }) {
 
         {/* Son İş Emirleri */}
         <div>
-          <div className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Son İş Emirleri</div>
-          <div className="space-y-2">
-            {isEmirleri.slice(0, 8).map(ie => (
-              <div key={ie.id} className="card">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-blue-300 font-mono">{ie.is_emri_no}</span>
-                  {durumBadge(ie.durum)}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {ie.urun_listesi?.map(u => `${u.stok_kodu} ×${u.adet}`).join(' · ')}
-                </div>
-                <div className="text-xs text-gray-600 mt-1">{new Date(ie.created_at).toLocaleString('tr-TR')}</div>
-              </div>
+          <div className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">İş Emirleri Durumu</div>
+          <div className="space-y-3">
+            {isEmirleri.slice(0, 10).map(ie => (
+              <IsEmriKart key={ie.id} ie={ie} />
             ))}
           </div>
         </div>
