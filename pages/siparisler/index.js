@@ -164,7 +164,15 @@ export default function Siparisler() {
 
   async function siparissSil(id) {
     if (!confirm('Bu siparişi silmek istediğinize emin misiniz?')) return
+    const silinen = siparisler.find(s => s.id === id)
     await supabase.from('siparisler').delete().eq('id', id)
+    // Aynı üründen başka sipariş kalmadıysa planı da sil
+    if (silinen) {
+      const kalanlar = siparisler.filter(s => s.id !== id && s.urun_stok_kodu === silinen.urun_stok_kodu)
+      if (kalanlar.length === 0) {
+        await supabase.from('uretim_plani').delete().eq('urun_stok_kodu', silinen.urun_stok_kodu)
+      }
+    }
     setSiparisler(prev => prev.filter(s => s.id !== id))
     setModal(null)
   }
@@ -218,7 +226,18 @@ export default function Siparisler() {
   async function topluSil() {
     if (!seciliSiparisler.length) return
     if (!confirm(`${seciliSiparisler.length} siparişi silmek istediğinize emin misiniz?`)) return
+    // Silinecek siparişlerin ürünlerini bul
+    const silinecekler = siparisler.filter(s => seciliSiparisler.includes(s.id))
+    const silinecekStoklar = [...new Set(silinecekler.map(s => s.urun_stok_kodu))]
     await supabase.from('siparisler').delete().in('id', seciliSiparisler)
+    // Kalan siparişlerde bu ürünler yoksa planları sil
+    const kalanSiparisler = siparisler.filter(s => !seciliSiparisler.includes(s.id))
+    for (const stok of silinecekStoklar) {
+      const kalanVarMi = kalanSiparisler.some(s => s.urun_stok_kodu === stok)
+      if (!kalanVarMi) {
+        await supabase.from('uretim_plani').delete().eq('urun_stok_kodu', stok)
+      }
+    }
     setSeciliSiparisler([])
     yukle()
   }
