@@ -232,11 +232,16 @@ export default function GunlukPlan({ profil }) {
                   </div>
                   <table className="w-full">
                     <tbody>
-                      {urunler.map((u, i) => (
+                      {[...urunler].sort((a,b) => (b.oncelikli ? 1 : 0) - (a.oncelikli ? 1 : 0)).map((u, i) => (
                         <tr key={i} className="border-t border-gray-800">
-                          <td className="py-1.5 text-sm text-gray-200">{u.urun_stok_kodu}</td>
+                          <td className="py-1.5 text-sm">
+                            <div className="flex items-center gap-2">
+                              {u.oncelikli && <span className="text-orange-400 text-xs font-bold">⚡ ÖNCELİKLİ</span>}
+                              <span className={u.oncelikli ? 'text-orange-300 font-medium' : 'text-gray-200'}>{u.urun_stok_kodu}</span>
+                            </div>
+                          </td>
                           <td className="py-1.5 text-right">
-                            <span className="badge badge-blue">{u.planlanan_adet} adet</span>
+                            <span className={`badge ${u.oncelikli ? 'badge-orange' : 'badge-blue'}`}>{u.planlanan_adet} adet</span>
                           </td>
                         </tr>
                       ))}
