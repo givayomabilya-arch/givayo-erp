@@ -182,8 +182,13 @@ export default function Tablet({ profil }) {
             </span>
           </div>
 
-          {/* İş emirleri gruplu */}
-          {isler.map((g, idx) => {
+          {/* İş emirleri gruplu - bekleyenler üstte */}
+          {[...isler].sort((a, b) => {
+            const aTam = !!tamamlananlar[`${a.ie_id}-${a.tip}`]
+            const bTam = !!tamamlananlar[`${b.ie_id}-${b.tip}`]
+            if (aTam !== bTam) return aTam ? 1 : -1
+            return 0
+          }).map((g, idx) => {
             const key = `${g.ie_id}-${g.tip}`
             const tam = !!tamamlananlar[key]
             return (
