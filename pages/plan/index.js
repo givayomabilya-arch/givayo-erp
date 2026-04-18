@@ -63,7 +63,7 @@ export default function UretimPlaniSayfa({ profil }) {
     const satirlar = urunPlanSatirlari(stok).filter(s => s.tarih && parseInt(s.adet) > 0)
     if (!satirlar.length) return alert('Tarih ve adet girin')
     setKayit(true)
-    await supabase.from('uretim_plani').delete().eq('urun_stok_kodu', stok)
+    await supabase.from('uretim_plani').delete().eq('urun_stok_kodu', stok).eq('durum', 'planli')
     await supabase.from('uretim_plani').insert(
       satirlar.map(s => ({
         urun_stok_kodu: stok,
