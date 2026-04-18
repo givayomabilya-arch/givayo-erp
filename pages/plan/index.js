@@ -41,7 +41,7 @@ export default function UretimPlaniSayfa({ profil }) {
   }
 
   function urunPlanSatirlari(stok) {
-    return planForm[stok] || [{ tarih: '', adet: '' }]
+    return planForm[stok] || [{ tarih: '', adet: '', oncelikli: false }]
   }
 
   function satirGuncelle(stok, idx, field, value) {
@@ -69,6 +69,7 @@ export default function UretimPlaniSayfa({ profil }) {
         urun_stok_kodu: stok,
         uretim_tarihi: s.tarih,
         planlanan_adet: parseInt(s.adet),
+        oncelikli: s.oncelikli || false,
         durum: 'planli'
       }))
     )
@@ -82,7 +83,7 @@ export default function UretimPlaniSayfa({ profil }) {
   function planDuzenle(stok) {
     const mevcutPlanlar = planlar.filter(p => p.urun_stok_kodu === stok)
     if (mevcutPlanlar.length) {
-      setPlanForm(p => ({ ...p, [stok]: mevcutPlanlar.map(p => ({ tarih: p.uretim_tarihi, adet: p.planlanan_adet })) }))
+      setPlanForm(p => ({ ...p, [stok]: mevcutPlanlar.map(p => ({ tarih: p.uretim_tarihi, adet: p.planlanan_adet, oncelikli: p.oncelikli || false })) }))
     }
     setAktifUrun(stok)
   }
@@ -149,7 +150,10 @@ export default function UretimPlaniSayfa({ profil }) {
                       <div key={idx} className="flex gap-2 mb-2 items-center">
                         <input type="date" className="input w-44" value={s.tarih} onChange={e => satirGuncelle(g.stok, idx, 'tarih', e.target.value)} />
                         <input type="number" className="input w-24" placeholder="Adet" value={s.adet} onChange={e => satirGuncelle(g.stok, idx, 'adet', e.target.value)} />
-                        <span className="text-xs text-gray-500">adet</span>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input type="checkbox" className="accent-orange-500" checked={s.oncelikli || false} onChange={e => satirGuncelle(g.stok, idx, 'oncelikli', e.target.checked)} />
+                          <span className="text-xs text-orange-400">Öncelikli</span>
+                        </label>
                         {urunPlanSatirlari(g.stok).length > 1 && (
                           <button className="text-red-400 text-xs hover:text-red-300" onClick={() => satirSil(g.stok, idx)}>✕</button>
                         )}
