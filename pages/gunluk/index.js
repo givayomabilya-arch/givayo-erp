@@ -102,7 +102,7 @@ export default function GunlukPlan({ profil }) {
   async function yukle() {
     setLoading(true)
     const [{ data: p }, { data: ie }] = await Promise.all([
-      supabase.from('uretim_plani').select('*').gte('uretim_tarihi', new Date().toISOString().split('T')[0]).order('uretim_tarihi'),
+      supabase.from('uretim_plani').select('*').gte('uretim_tarihi', new Date().toISOString().split('T')[0]).eq('durum', 'planli').order('uretim_tarihi'),
       supabase.from('is_emirleri').select('*').order('created_at', { ascending: false }).limit(20)
     ])
     setPlanlar(p || [])
