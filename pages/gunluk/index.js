@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/router'
 
-const ISTASYONLAR = {
-  ebatlama: ['Ebatlama 1', 'Ebatlama 2', 'Ebatlama 3'],
-  bantlama: ['Bantlama 1', 'Bantlama 2'],
-  delik: ['Delik 1', 'Delik 2'],
-  aksesuar: ['Aksesuar 1', 'Aksesuar 2'],
-  kartoncu: ['Kartoncu 1', 'Kartoncu 2'],
-  paketci: ['Paketçi 1', 'Paketçi 2', 'Paketçi 3'],
+// İstasyonlar state'den gelecek - başlangıç değerleri
+const ISTASYONLAR_DEFAULT = {
+  ebatlama: ['Ebatlama 1'],
+  bantlama: ['Bantlama 1'],
+  delik: ['Delik 1'],
+  aksesuar: ['Aksesuar 1'],
+  kartoncu: ['Kartoncu 1'],
+  paketci: ['Paketçi 1'],
 }
 
 const PARCA_GRUPLARI = ['Tüm parçalar', 'Parçalar 1–3', 'Parçalar 4–6', 'Parçalar 7–8', 'Parçalar 1–4', 'Parçalar 5–8']
@@ -91,7 +92,8 @@ export default function GunlukPlan({ profil }) {
   const [seciliGun, setSeciliGun] = useState(null)
   const [kayit, setKayit] = useState(false)
   const [urunAtamalari, setUrunAtamalari] = useState({}) // stok_kodu -> atamalar
-  const [seciliUrun, setSeciliUrun] = useState(null) // hangi ürünün ataması düzenleniyor
+  const [seciliUrun, setSeciliUrun] = useState(null)
+  const [ISTASYONLAR, setISTASYONLAR] = useState(ISTASYONLAR_DEFAULT) // hangi ürünün ataması düzenleniyor
   const [duzenleModal, setDuzenleModal] = useState(false)
   const [duzenleIe, setDuzenleIe] = useState(null)
   const [duzenleAtamalar, setDuzenleAtamalar] = useState({})
@@ -118,6 +120,16 @@ export default function GunlukPlan({ profil }) {
 
   async function yukle() {
     setLoading(true)
+    // İstasyonları yükle
+    const { data: istDB } = await supabase.from('istasyonlar').select('tip,ad').eq('aktif', true).order('tip').order('sira')
+    if (istDB) {
+      const grouped = {}
+      for (const i of istDB) {
+        if (!grouped[i.tip]) grouped[i.tip] = []
+        grouped[i.tip].push(i.ad)
+      }
+      setISTASYONLAR(prev => ({ ...prev, ...grouped }))
+    }
     const [{ data: p }, { data: ie }] = await Promise.all([
       supabase.from('uretim_plani').select('*').gte('uretim_tarihi', new Date().toISOString().split('T')[0]).eq('durum', 'planli').order('uretim_tarihi'),
       supabase.from('is_emirleri').select('*').order('created_at', { ascending: false }).limit(20)
