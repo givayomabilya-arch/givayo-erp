@@ -1,23 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
-const ISTASYON_LISTESI = [
-  { value: '', label: '— İstasyon Seçin —' },
-  { value: 'Ebatlama 1', label: 'Ebatlama Tezgahı 1' },
-  { value: 'Ebatlama 2', label: 'Ebatlama Tezgahı 2' },
-  { value: 'Ebatlama 3', label: 'Ebatlama Tezgahı 3' },
-  { value: 'Bantlama 1', label: 'Bantlama Tezgahı 1' },
-  { value: 'Bantlama 2', label: 'Bantlama Tezgahı 2' },
-  { value: 'Delik 1', label: 'Delik Tezgahı 1' },
-  { value: 'Delik 2', label: 'Delik Tezgahı 2' },
-  { value: 'Aksesuar 1', label: 'Aksesuar Personeli 1' },
-  { value: 'Aksesuar 2', label: 'Aksesuar Personeli 2' },
-  { value: 'Kartoncu 1', label: 'Kartoncu 1' },
-  { value: 'Kartoncu 2', label: 'Kartoncu 2' },
-  { value: 'Paketçi 1', label: 'Paketçi 1' },
-  { value: 'Paketçi 2', label: 'Paketçi 2' },
-  { value: 'Paketçi 3', label: 'Paketçi 3' },
-]
+// İstasyonlar DB'den yükleniyor
 
 const ASAMA_SIRASI = [
   { tip: 'ebatlama', label: 'Kesim', icon: '✂️' },
@@ -61,7 +45,12 @@ export default function Tablet({ profil }) {
   const [tamamlananlar, setTamamlananlar] = useState({}) // "ie_id-tip" -> true
   const [loading, setLoading] = useState(false)
   const [belgeModal, setBelgeModal] = useState(null)
+  const [istasyonListesi, setIstasyonListesi] = useState([])
   const [gunBitti, setGunBitti] = useState(false)
+
+  useEffect(() => {
+    supabase.from('istasyonlar').select('ad').eq('aktif', true).order('tip').order('sira').then(({ data }) => setIstasyonListesi(data?.map(i => i.ad) || []))
+  }, [])
 
   useEffect(() => {
     if (profil?.rol === 'eleman' && profil?.istasyon) {
@@ -192,7 +181,8 @@ export default function Tablet({ profil }) {
         <div className="card mb-4">
           <label className="label">İstasyon</label>
           <select className="input" value={istasyon} onChange={e => { setIstasyon(e.target.value); yukle(e.target.value) }}>
-            {ISTASYON_LISTESI.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+            <option value="">— İstasyon Seçin —</option>
+            {istasyonListesi.map(ist => <option key={ist} value={ist}>{ist}</option>)}
           </select>
         </div>
       )}
