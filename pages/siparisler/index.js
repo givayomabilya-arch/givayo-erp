@@ -7,6 +7,7 @@ const DURUMLAR = [
   { value: 'uretimde', label: 'Üretimde', cls: 'badge-orange' },
   { value: 'kargoya_hazir', label: 'Kargoya Hazır', cls: 'badge-green' },
   { value: 'tamamlandi', label: 'Tamamlandı', cls: 'badge-gray' },
+  { value: 'iptal', label: 'İptal', cls: 'badge-red' },
 ]
 
 const PLATFORMLAR = ['Trendyol', 'Hepsiburada', 'Manuel', 'Toptan', 'Diğer']
@@ -158,8 +159,89 @@ export default function Siparisler() {
   }
 
   async function durumGuncelle(id, durum) {
+    if (durum === 'iptal') {
+      if (!confirm('Bu siparişi iptal etmek istediğinize emin misiniz? Üretim planı ve iş emirlerinden düşülecek.')) return
+      await iptalEt(id)
+      return
+    }
     await supabase.from('siparisler').update({ durum }).eq('id', id)
     setSiparisler(prev => prev.map(s => s.id === id ? { ...s, durum } : s))
+  }
+
+  async function iptalEt(id) {
+    const siparis = siparisler.find(s => s.id === id)
+    if (!siparis) return
+
+    // Siparişi iptal et
+    await supabase.from('siparisler').update({ durum: 'iptal' }).eq('id', id)
+    setSiparisler(prev => prev.map(s => s.id === id ? { ...s, durum: 'iptal' } : s))
+
+    const stok = siparis.urun_stok_kodu
+    const iptalAdet = siparis.adet || 1
+
+    // Üretim planından düş
+    const { data: planlar } = await supabase
+      .from('uretim_plani')
+      .select('*')
+      .eq('urun_stok_kodu', stok)
+      .eq('durum', 'planli')
+      .order('uretim_tarihi')
+
+    if (planlar && planlar.length > 0) {
+      let kalanDus = iptalAdet
+      for (const plan of planlar) {
+        if (kalanDus <= 0) break
+        const yeniAdet = plan.planlanan_adet - kalanDus
+        if (yeniAdet <= 0) {
+          await supabase.from('uretim_plani').delete().eq('id', plan.id)
+          kalanDus -= plan.planlanan_adet
+        } else {
+          await supabase.from('uretim_plani').update({ planlanan_adet: yeniAdet }).eq('id', plan.id)
+          kalanDus = 0
+        }
+      }
+    }
+
+    // İş emirlerinden düş
+    const { data: emirler } = await supabase
+      .from('is_emirleri')
+      .select('*')
+      .eq('durum', 'aktif')
+      .contains('urun_listesi', JSON.stringify([{ stok_kodu: stok }]))
+
+    // Alternatif: tüm aktif emirleri çek ve içinde bu ürün var mı bak
+    const { data: tumEmirler } = await supabase
+      .from('is_emirleri')
+      .select('*')
+      .eq('durum', 'aktif')
+
+    let kalanDus = iptalAdet
+    for (const ie of (tumEmirler || [])) {
+      if (kalanDus <= 0) break
+      const urunListesi = ie.urun_listesi || []
+      const urunIdx = urunListesi.findIndex(u => u.stok_kodu === stok)
+      if (urunIdx === -1) continue
+
+      const mevcutAdet = urunListesi[urunIdx].adet
+      const yeniAdet = mevcutAdet - kalanDus
+
+      if (yeniAdet <= 0) {
+        // Bu üründen düştükten sonra iş emrinde başka ürün kaldı mı?
+        const yeniListe = urunListesi.filter((_, i) => i !== urunIdx)
+        if (yeniListe.length === 0) {
+          await supabase.from('is_emirleri').update({ durum: 'iptal' }).eq('id', ie.id)
+        } else {
+          const yeniToplam = yeniListe.reduce((t, u) => t + u.adet, 0)
+          await supabase.from('is_emirleri').update({ urun_listesi: yeniListe, toplam_adet: yeniToplam }).eq('id', ie.id)
+        }
+        kalanDus -= mevcutAdet
+      } else {
+        const yeniListe = urunListesi.map((u, i) => i === urunIdx ? { ...u, adet: yeniAdet } : u)
+        const yeniToplam = yeniListe.reduce((t, u) => t + u.adet, 0)
+        await supabase.from('is_emirleri').update({ urun_listesi: yeniListe, toplam_adet: yeniToplam }).eq('id', ie.id)
+        kalanDus = 0
+      }
+    }
   }
 
   async function siparissSil(id) {
