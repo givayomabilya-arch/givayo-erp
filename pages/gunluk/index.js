@@ -85,14 +85,23 @@ export default function GunlukPlan({ profil }) {
   const [modal, setModal] = useState(false)
   const [seciliGun, setSeciliGun] = useState(null)
   const [kayit, setKayit] = useState(false)
-  const [atamalar, setAtamalar] = useState({
-    ebatlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Ebatlama 1' }],
-    bantlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Bantlama 1' }],
-    delik: [{ parcalar: 'Tüm parçalar', istasyon: 'Delik 1' }],
-    aksesuar: 'Aksesuar 1',
-    kartoncu: 'Kartoncu 1',
-    paketci: [{ adet: '', istasyon: 'Paketçi 1' }],
-  })
+  const [urunAtamalari, setUrunAtamalari] = useState({}) // stok_kodu -> atamalar
+  const [seciliUrun, setSeciliUrun] = useState(null) // hangi ürünün ataması düzenleniyor
+
+  function bosAtama() {
+    return {
+      ebatlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Ebatlama 1' }],
+      bantlama: [{ parcalar: 'Tüm parçalar', istasyon: 'Bantlama 1' }],
+      delik: [{ parcalar: 'Tüm parçalar', istasyon: 'Delik 1' }],
+      aksesuar: 'Aksesuar 1',
+      kartoncu: 'Kartoncu 1',
+      paketci: [{ adet: '', istasyon: 'Paketçi 1' }],
+    }
+  }
+
+  function urunAtama(stok) {
+    return urunAtamalari[stok] || bosAtama()
+  }
 
   useEffect(() => {
     if (profil?.rol !== 'foremen' && profil?.rol !== 'yonetici') { router.push('/'); return }
@@ -119,20 +128,28 @@ export default function GunlukPlan({ profil }) {
     return Object.entries(g).sort(([a], [b]) => a.localeCompare(b))
   }
 
-  function satirEkle(tip) {
+  function satirEkle(stok, tip) {
+    const mevcut = urunAtama(stok)
     if (tip === 'paketci') {
-      setAtamalar(p => ({ ...p, paketci: [...p.paketci, { adet: '', istasyon: 'Paketçi 1' }] }))
+      setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, paketci: [...mevcut.paketci, { adet: '', istasyon: 'Paketçi 1' }] } }))
     } else {
-      setAtamalar(p => ({ ...p, [tip]: [...p[tip], { parcalar: 'Tüm parçalar', istasyon: ISTASYONLAR[tip][0] }] }))
+      setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, [tip]: [...mevcut[tip], { parcalar: 'Tüm parçalar', istasyon: ISTASYONLAR[tip][0] }] } }))
     }
   }
 
-  function satirSil(tip, idx) {
-    setAtamalar(p => ({ ...p, [tip]: p[tip].filter((_, i) => i !== idx) }))
+  function satirSil(stok, tip, idx) {
+    const mevcut = urunAtama(stok)
+    setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, [tip]: mevcut[tip].filter((_, i) => i !== idx) } }))
   }
 
-  function satirGuncelle(tip, idx, field, value) {
-    setAtamalar(p => ({ ...p, [tip]: p[tip].map((s, i) => i === idx ? { ...s, [field]: value } : s) }))
+  function satirGuncelle(stok, tip, idx, field, value) {
+    const mevcut = urunAtama(stok)
+    setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, [tip]: mevcut[tip].map((s, i) => i === idx ? { ...s, [field]: value } : s) } }))
+  }
+
+  function aksesuarGuncelle(stok, tip, value) {
+    const mevcut = urunAtama(stok)
+    setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, [tip]: value } }))
   }
 
   async function isEmriOlustur() {
@@ -160,7 +177,7 @@ export default function GunlukPlan({ profil }) {
         siparis_idler: siparsIds,
         urun_listesi: [{ stok_kodu: urun.urun_stok_kodu, adet: urun.planlanan_adet }],
         toplam_adet: urun.planlanan_adet,
-        atamalar: atamalar,
+        atamalar: urunAtama(urun.urun_stok_kodu),
         durum: 'aktif',
         uretim_tarihi: seciliGun.tarih,
       })
@@ -230,7 +247,7 @@ export default function GunlukPlan({ profil }) {
                     {!hepsiOlusturuldu && (
                       <button
                         className="btn-primary btn-sm text-xs"
-                        onClick={() => { setSeciliGun({ tarih, urunler }); setModal(true) }}
+                        onClick={() => { setSeciliGun({ tarih, urunler }); setUrunAtamalari({}); setSeciliUrun(urunler[0]?.urun_stok_kodu || null); setModal(true) }}
                       >
                         İş Emri Oluştur
                       </button>
@@ -281,59 +298,63 @@ export default function GunlukPlan({ profil }) {
               <button className="btn btn-sm" onClick={() => setModal(false)}>✕</button>
             </div>
             <div className="p-4 space-y-4">
-              {/* Ürünler */}
-              <div>
-                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Üretilecek Ürünler</div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  {seciliGun.urunler.map((u, i) => (
-                    <div key={i} className="flex justify-between items-center py-1 border-b border-gray-700 last:border-0">
-                      <span className="text-sm font-medium">{u.urun_stok_kodu}</span>
-                      <span className="badge badge-blue">{u.planlanan_adet} adet</span>
-                    </div>
-                  ))}
-                  <div className="pt-2 text-right text-sm font-medium text-blue-400">
-                    Toplam: {seciliGun.urunler.reduce((t, u) => t + u.planlanan_adet, 0)} adet
-                  </div>
-                </div>
-              </div>
-
-              {/* Ebatlama */}
-              <AtamaBlok baslik="Ebatlama" satirlar={atamalar.ebatlama} istasyonlar={ISTASYONLAR.ebatlama} onEkle={() => satirEkle('ebatlama')} onSil={(i) => satirSil('ebatlama', i)} onGuncelle={(i, f, v) => satirGuncelle('ebatlama', i, f, v)} />
-              <AtamaBlok baslik="Bantlama" satirlar={atamalar.bantlama} istasyonlar={ISTASYONLAR.bantlama} onEkle={() => satirEkle('bantlama')} onSil={(i) => satirSil('bantlama', i)} onGuncelle={(i, f, v) => satirGuncelle('bantlama', i, f, v)} />
-              <AtamaBlok baslik="Delik İşleme" satirlar={atamalar.delik} istasyonlar={ISTASYONLAR.delik} onEkle={() => satirEkle('delik')} onSil={(i) => satirSil('delik', i)} onGuncelle={(i, f, v) => satirGuncelle('delik', i, f, v)} />
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Aksesuar</div>
-                  <select className="input" value={atamalar.aksesuar} onChange={e => setAtamalar(p => ({ ...p, aksesuar: e.target.value }))}>
-                    {ISTASYONLAR.aksesuar.map(i => <option key={i}>{i}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Kartoncu</div>
-                  <select className="input" value={atamalar.kartoncu} onChange={e => setAtamalar(p => ({ ...p, kartoncu: e.target.value }))}>
-                    {ISTASYONLAR.kartoncu.map(i => <option key={i}>{i}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide">Paketleme</div>
-                  <button className="btn btn-sm text-xs" onClick={() => satirEkle('paketci')}>+ Satır</button>
-                </div>
-                {atamalar.paketci.map((s, i) => (
-                  <div key={i} className="flex gap-2 mb-2">
-                    <input type="number" className="input w-24" placeholder="Adet" value={s.adet} onChange={e => satirGuncelle('paketci', i, 'adet', e.target.value)} />
-                    <select className="input" value={s.istasyon} onChange={e => satirGuncelle('paketci', i, 'istasyon', e.target.value)}>
-                      {ISTASYONLAR.paketci.map(ist => <option key={ist}>{ist}</option>)}
-                    </select>
-                    {atamalar.paketci.length > 1 && (
-                      <button className="btn btn-sm btn-danger" onClick={() => satirSil('paketci', i)}>✕</button>
-                    )}
-                  </div>
+              {/* Ürün sekmeleri */}
+              <div className="flex gap-1 flex-wrap border-b border-gray-800 pb-3">
+                {seciliGun.urunler.map((u, i) => (
+                  <button
+                    key={i}
+                    className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${seciliUrun === u.urun_stok_kodu ? 'bg-blue-900 border-blue-600 text-blue-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                    onClick={() => setSeciliUrun(u.urun_stok_kodu)}
+                  >
+                    {u.urun_stok_kodu}
+                    <span className="ml-1 text-gray-500">×{u.planlanan_adet}</span>
+                  </button>
                 ))}
               </div>
+
+              {!seciliUrun ? (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  Atama yapmak istediğiniz ürüne tıklayın
+                </div>
+              ) : (
+                <div>
+                  <div className="text-sm font-medium text-blue-300 mb-3">{seciliUrun} — İstasyon Ataması</div>
+                  <AtamaBlok baslik="Ebatlama" satirlar={urunAtama(seciliUrun).ebatlama} istasyonlar={ISTASYONLAR.ebatlama} onEkle={() => satirEkle(seciliUrun, 'ebatlama')} onSil={(i) => satirSil(seciliUrun, 'ebatlama', i)} onGuncelle={(i, f, v) => satirGuncelle(seciliUrun, 'ebatlama', i, f, v)} />
+                  <AtamaBlok baslik="Bantlama" satirlar={urunAtama(seciliUrun).bantlama} istasyonlar={ISTASYONLAR.bantlama} onEkle={() => satirEkle(seciliUrun, 'bantlama')} onSil={(i) => satirSil(seciliUrun, 'bantlama', i)} onGuncelle={(i, f, v) => satirGuncelle(seciliUrun, 'bantlama', i, f, v)} />
+                  <AtamaBlok baslik="Delik İşleme" satirlar={urunAtama(seciliUrun).delik} istasyonlar={ISTASYONLAR.delik} onEkle={() => satirEkle(seciliUrun, 'delik')} onSil={(i) => satirSil(seciliUrun, 'delik', i)} onGuncelle={(i, f, v) => satirGuncelle(seciliUrun, 'delik', i, f, v)} />
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Aksesuar</div>
+                      <select className="input" value={urunAtama(seciliUrun).aksesuar} onChange={e => aksesuarGuncelle(seciliUrun, 'aksesuar', e.target.value)}>
+                        {ISTASYONLAR.aksesuar.map(i => <option key={i}>{i}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Kartoncu</div>
+                      <select className="input" value={urunAtama(seciliUrun).kartoncu} onChange={e => aksesuarGuncelle(seciliUrun, 'kartoncu', e.target.value)}>
+                        {ISTASYONLAR.kartoncu.map(i => <option key={i}>{i}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-xs text-gray-400 uppercase tracking-wide">Paketleme</div>
+                      <button className="btn btn-sm text-xs" onClick={() => satirEkle(seciliUrun, 'paketci')}>+ Satır</button>
+                    </div>
+                    {urunAtama(seciliUrun).paketci.map((s, i) => (
+                      <div key={i} className="flex gap-2 mb-2">
+                        <input type="number" className="input w-24" placeholder="Adet" value={s.adet} onChange={e => satirGuncelle(seciliUrun, 'paketci', i, 'adet', e.target.value)} />
+                        <select className="input" value={s.istasyon} onChange={e => satirGuncelle(seciliUrun, 'paketci', i, 'istasyon', e.target.value)}>
+                          {ISTASYONLAR.paketci.map(ist => <option key={ist}>{ist}</option>)}
+                        </select>
+                        {urunAtama(seciliUrun).paketci.length > 1 && (
+                          <button className="btn btn-sm btn-danger" onClick={() => satirSil(seciliUrun, 'paketci', i)}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-800">
               <button className="btn" onClick={() => setModal(false)}>İptal</button>
