@@ -141,7 +141,8 @@ export default function GunlukPlan({ profil }) {
 
     const urunListesi = seciliGun.urunler.map(u => ({ stok_kodu: u.urun_stok_kodu, adet: u.planlanan_adet }))
     const toplamAdet = seciliGun.urunler.reduce((t, u) => t + u.planlanan_adet, 0)
-    const no = 'İE-' + new Date().getFullYear() + '-' + String(isEmirleri.length + 1).padStart(3, '0')
+    const now = new Date()
+    const no = 'İE-' + now.getFullYear() + now.toISOString().slice(5,7) + now.toISOString().slice(8,10) + '-' + String(Date.now()).slice(-4)
 
     // Bekleyen siparişleri bul
     const stokKodlari = seciliGun.urunler.map(u => u.urun_stok_kodu)
