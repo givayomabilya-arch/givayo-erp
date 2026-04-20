@@ -19,6 +19,42 @@ const ISTASYON_LISTESI = [
   { value: 'Paketçi 3', label: 'Paketçi 3' },
 ]
 
+const ASAMA_SIRASI = [
+  { tip: 'ebatlama', label: 'Kesim', icon: '✂️' },
+  { tip: 'bantlama', label: 'Bant', icon: '📏' },
+  { tip: 'delik', label: 'Delik', icon: '🔩' },
+  { tip: 'aksesuar', label: 'Aksesuar', icon: '🔧' },
+  { tip: 'kartoncu', label: 'Karton', icon: '📦' },
+  { tip: 'paketci', label: 'Paket', icon: '🎁' },
+]
+
+function AsamaBar({ tamamlananTipler, aktifTip }) {
+  return (
+    <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1">
+      {ASAMA_SIRASI.map((asama, idx) => {
+        const tamam = tamamlananTipler.has(asama.tip)
+        const aktif = asama.tip === aktifTip
+        return (
+          <div key={asama.tip} className="flex items-center">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs whitespace-nowrap ${
+              tamam ? 'bg-green-900 text-green-300' :
+              aktif ? 'bg-blue-900 text-blue-300 ring-1 ring-blue-500' :
+              'bg-gray-800 text-gray-500'
+            }`}>
+              <span>{asama.icon}</span>
+              <span>{asama.label}</span>
+              {tamam && <span>✓</span>}
+            </div>
+            {idx < ASAMA_SIRASI.length - 1 && (
+              <span className={`text-xs mx-0.5 ${tamam ? 'text-green-700' : 'text-gray-700'}`}>→</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Tablet({ profil }) {
   const [istasyon, setIstasyon] = useState('')
   const [isler, setIsler] = useState([]) // {ie_id, ie_no, tip, urunler, parcalar}
@@ -68,10 +104,23 @@ export default function Tablet({ profil }) {
       .in('is_emri_id', (emirler || []).map(e => e.id))
       .eq('istasyon', ist)
 
+    // Tüm tamamlananları çek (aşama göstermek için)
+    const { data: tumTam } = await supabase
+      .from('is_tamamlama')
+      .select('is_emri_id,tip')
+      .in('is_emri_id', (emirler || []).map(e => e.id))
+
     const tamMap = {}
     for (const t of (tam || [])) tamMap[`${t.is_emri_id}-${t.tip}`] = true
 
-    setIsler(gorevler)
+    // Her iş emri için tamamlanan tipler
+    const tiplerMap = {}
+    for (const t of (tumTam || [])) {
+      if (!tiplerMap[t.is_emri_id]) tiplerMap[t.is_emri_id] = new Set()
+      tiplerMap[t.is_emri_id].add(t.tip)
+    }
+
+    setIsler(gorevler.map(g => ({ ...g, tamamlananTipler: tiplerMap[g.ie_id] || new Set() })))
     setTamamlananlar(tamMap)
     setLoading(false)
   }
@@ -212,6 +261,9 @@ export default function Tablet({ profil }) {
                     {tam ? '✓' : ''}
                   </button>
                 </div>
+
+                {/* Üretim aşaması */}
+                <AsamaBar ie_id={g.ie_id} tamamlananTipler={g.tamamlananTipler || new Set()} aktifTip={g.tip} />
 
                 {/* Ürün listesi */}
                 <div className="space-y-1">
