@@ -139,40 +139,45 @@ export default function GunlukPlan({ profil }) {
     if (!seciliGun) return
     setKayit(true)
 
-    const urunListesi = seciliGun.urunler.map(u => ({ stok_kodu: u.urun_stok_kodu, adet: u.planlanan_adet }))
-    const toplamAdet = seciliGun.urunler.reduce((t, u) => t + u.planlanan_adet, 0)
     const now = new Date()
-    const no = 'İE-' + now.getFullYear() + now.toISOString().slice(5,7) + now.toISOString().slice(8,10) + '-' + String(Date.now()).slice(-4)
+    let hata = null
 
-    // Bekleyen siparişleri bul
-    const stokKodlari = seciliGun.urunler.map(u => u.urun_stok_kodu)
-    const { data: siparisler } = await supabase
-      .from('siparisler')
-      .select('id')
-      .eq('durum', 'beklemede')
-      .in('urun_stok_kodu', stokKodlari)
+    // Her ürün için ayrı iş emri oluştur
+    for (const urun of seciliGun.urunler) {
+      const no = 'İE-' + now.getFullYear() + now.toISOString().slice(5,7) + now.toISOString().slice(8,10) + '-' + String(Date.now()).slice(-4) + '-' + Math.floor(Math.random()*100)
 
-    const siparsIds = (siparisler || []).map(s => s.id)
+      // Bu ürüne ait bekleyen siparişleri bul
+      const { data: siparisler } = await supabase
+        .from('siparisler')
+        .select('id')
+        .eq('durum', 'beklemede')
+        .eq('urun_stok_kodu', urun.urun_stok_kodu)
 
-    const { error } = await supabase.from('is_emirleri').insert({
-      is_emri_no: no,
-      siparis_idler: siparsIds,
-      urun_listesi: urunListesi,
-      toplam_adet: toplamAdet,
-      atamalar: atamalar,
-      durum: 'aktif',
-    })
+      const siparsIds = (siparisler || []).map(s => s.id)
 
-    if (!error && siparsIds.length > 0) {
-      await supabase.from('siparisler').update({ durum: 'uretimde' }).in('id', siparsIds)
+      const { error } = await supabase.from('is_emirleri').insert({
+        is_emri_no: no,
+        siparis_idler: siparsIds,
+        urun_listesi: [{ stok_kodu: urun.urun_stok_kodu, adet: urun.planlanan_adet }],
+        toplam_adet: urun.planlanan_adet,
+        atamalar: atamalar,
+        durum: 'aktif',
+        uretim_tarihi: seciliGun.tarih,
+      })
+
+      if (error) { hata = error; break }
+
+      if (siparsIds.length > 0) {
+        await supabase.from('siparisler').update({ durum: 'uretimde' }).in('id', siparsIds)
+      }
     }
 
-    // Planı tamamlandı olarak işaretle
+    // Planları tamamlandı olarak işaretle
     const planIds = seciliGun.urunler.map(u => u.id)
     await supabase.from('uretim_plani').update({ durum: 'is_emri_olusturuldu' }).in('id', planIds)
 
     setKayit(false)
-    if (error) return alert('Hata: ' + error.message)
+    if (hata) return alert('Hata: ' + hata.message)
     setModal(false)
     setSeciliGun(null)
     yukle()
