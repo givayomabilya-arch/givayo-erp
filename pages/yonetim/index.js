@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 
 const ROLLER = [
   { value: 'yonetici', label: 'Yönetici' },
-  { value: 'foremen', label: 'Foremen' },
+  { value: 'foremen', label: 'Foreman' },
   { value: 'siparis', label: 'Sipariş Yükleyici' },
   { value: 'eleman', label: 'Eleman' },
 ]
@@ -108,7 +108,7 @@ export default function Yonetim({ profil }) {
     setModal('duzenle')
   }
 
-  const rolLabel = { yonetici: 'Yönetici', foremen: 'Foremen', siparis: 'Sipariş', eleman: 'Eleman' }
+  const rolLabel = { yonetici: 'Yönetici', foremen: 'Foreman', siparis: 'Sipariş', eleman: 'Eleman' }
   const rolRenk = { yonetici: 'badge-blue', foremen: 'badge-orange', siparis: 'badge-green', eleman: 'badge-gray' }
 
   return (
