@@ -13,7 +13,7 @@ const ISTASYONLAR = {
 
 const PARCA_GRUPLARI = ['Tüm parçalar', 'Parçalar 1–3', 'Parçalar 4–6', 'Parçalar 7–8', 'Parçalar 1–4', 'Parçalar 5–8']
 
-function IsEmriKart({ ie }) {
+function IsEmriKart({ ie, onDuzenle }) {
   const [tamamlananlar, setTamamlananlar] = useState([])
   const [yuklendi, setYuklendi] = useState(false)
 
@@ -56,9 +56,14 @@ function IsEmriKart({ ie }) {
     <div className="card">
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm font-medium text-blue-300 font-mono">{ie.is_emri_no}</span>
-        <span className={`badge ${ie.durum === 'tamamlandi' ? 'badge-green' : 'badge-orange'}`}>
-          {ie.durum === 'tamamlandi' ? 'Tamamlandı' : 'Aktif'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`badge ${ie.durum === 'tamamlandi' ? 'badge-green' : ie.durum === 'iptal' ? 'badge-red' : 'badge-orange'}`}>
+            {ie.durum === 'tamamlandi' ? 'Tamamlandı' : ie.durum === 'iptal' ? 'İptal' : 'Aktif'}
+          </span>
+          {ie.durum === 'aktif' && onDuzenle && (
+            <button className="btn btn-sm text-xs" onClick={() => onDuzenle(ie)}>✏️ Düzenle</button>
+          )}
+        </div>
       </div>
       <div className="text-xs text-gray-500 mb-2">
         {ie.urun_listesi?.map(u => `${u.stok_kodu} ×${u.adet}`).join(' · ')}
@@ -87,6 +92,9 @@ export default function GunlukPlan({ profil }) {
   const [kayit, setKayit] = useState(false)
   const [urunAtamalari, setUrunAtamalari] = useState({}) // stok_kodu -> atamalar
   const [seciliUrun, setSeciliUrun] = useState(null) // hangi ürünün ataması düzenleniyor
+  const [duzenleModal, setDuzenleModal] = useState(false)
+  const [duzenleIe, setDuzenleIe] = useState(null)
+  const [duzenleAtamalar, setDuzenleAtamalar] = useState({})
 
   function bosAtama() {
     return {
@@ -150,6 +158,45 @@ export default function GunlukPlan({ profil }) {
   function aksesuarGuncelle(stok, tip, value) {
     const mevcut = urunAtama(stok)
     setUrunAtamalari(p => ({ ...p, [stok]: { ...mevcut, [tip]: value } }))
+  }
+
+  function duzenleAc(ie) {
+    setDuzenleIe(ie)
+    setDuzenleAtamalar(ie.atamalar || bosAtama())
+    setDuzenleModal(true)
+  }
+
+  function duzenleAtamaSatirEkle(tip) {
+    if (tip === 'paketci') {
+      setDuzenleAtamalar(p => ({ ...p, paketci: [...(p.paketci || []), { adet: '', istasyon: 'Paketçi 1' }] }))
+    } else {
+      setDuzenleAtamalar(p => ({ ...p, [tip]: [...(p[tip] || []), { parcalar: 'Tüm parçalar', istasyon: ISTASYONLAR[tip][0] }] }))
+    }
+  }
+
+  function duzenleAtamaSatirSil(tip, idx) {
+    setDuzenleAtamalar(p => ({ ...p, [tip]: p[tip].filter((_, i) => i !== idx) }))
+  }
+
+  function duzenleAtamaSatirGuncelle(tip, idx, field, value) {
+    setDuzenleAtamalar(p => ({ ...p, [tip]: p[tip].map((s, i) => i === idx ? { ...s, [field]: value } : s) }))
+  }
+
+  async function duzenleKaydet() {
+    if (!duzenleIe) return
+    setKayit(true)
+    const { error } = await supabase.from('is_emirleri').update({ atamalar: duzenleAtamalar }).eq('id', duzenleIe.id)
+    setKayit(false)
+    if (error) return alert('Hata: ' + error.message)
+    setDuzenleModal(false)
+    setDuzenleIe(null)
+    yukle()
+  }
+
+  async function isEmriIptal(id) {
+    if (!confirm('Bu iş emrini iptal etmek istediğinize emin misiniz?')) return
+    await supabase.from('is_emirleri').update({ durum: 'iptal' }).eq('id', id)
+    yukle()
   }
 
   async function isEmriOlustur() {
@@ -281,11 +328,71 @@ export default function GunlukPlan({ profil }) {
           <div className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">İş Emirleri Durumu</div>
           <div className="space-y-3">
             {isEmirleri.slice(0, 10).map(ie => (
-              <IsEmriKart key={ie.id} ie={ie} />
+              <IsEmriKart key={ie.id} ie={ie} onDuzenle={duzenleAc} />
             ))}
           </div>
         </div>
       </div>
+
+      {/* İş Emri Düzenle Modal */}
+      {duzenleModal && duzenleIe && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl my-4">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <div>
+                <h2 className="font-medium">İş Emri Düzenle</h2>
+                <p className="text-xs text-gray-500 mt-0.5 font-mono">{duzenleIe.is_emri_no} · {duzenleIe.urun_listesi?.map(u => u.stok_kodu).join(', ')}</p>
+              </div>
+              <button className="btn btn-sm" onClick={() => setDuzenleModal(false)}>✕</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <AtamaBlok baslik="Ebatlama" satirlar={duzenleAtamalar.ebatlama || []} istasyonlar={ISTASYONLAR.ebatlama} onEkle={() => duzenleAtamaSatirEkle('ebatlama')} onSil={(i) => duzenleAtamaSatirSil('ebatlama', i)} onGuncelle={(i, f, v) => duzenleAtamaSatirGuncelle('ebatlama', i, f, v)} />
+              <AtamaBlok baslik="Bantlama" satirlar={duzenleAtamalar.bantlama || []} istasyonlar={ISTASYONLAR.bantlama} onEkle={() => duzenleAtamaSatirEkle('bantlama')} onSil={(i) => duzenleAtamaSatirSil('bantlama', i)} onGuncelle={(i, f, v) => duzenleAtamaSatirGuncelle('bantlama', i, f, v)} />
+              <AtamaBlok baslik="Delik İşleme" satirlar={duzenleAtamalar.delik || []} istasyonlar={ISTASYONLAR.delik} onEkle={() => duzenleAtamaSatirEkle('delik')} onSil={(i) => duzenleAtamaSatirSil('delik', i)} onGuncelle={(i, f, v) => duzenleAtamaSatirGuncelle('delik', i, f, v)} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Aksesuar</div>
+                  <select className="input" value={duzenleAtamalar.aksesuar || 'Aksesuar 1'} onChange={e => setDuzenleAtamalar(p => ({ ...p, aksesuar: e.target.value }))}>
+                    {ISTASYONLAR.aksesuar.map(i => <option key={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Kartoncu</div>
+                  <select className="input" value={duzenleAtamalar.kartoncu || 'Kartoncu 1'} onChange={e => setDuzenleAtamalar(p => ({ ...p, kartoncu: e.target.value }))}>
+                    {ISTASYONLAR.kartoncu.map(i => <option key={i}>{i}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-xs text-gray-400 uppercase tracking-wide">Paketleme</div>
+                  <button className="btn btn-sm text-xs" onClick={() => duzenleAtamaSatirEkle('paketci')}>+ Satır</button>
+                </div>
+                {(duzenleAtamalar.paketci || []).map((s, i) => (
+                  <div key={i} className="flex gap-2 mb-2">
+                    <input type="number" className="input w-24" placeholder="Adet" value={s.adet} onChange={e => duzenleAtamaSatirGuncelle('paketci', i, 'adet', e.target.value)} />
+                    <select className="input" value={s.istasyon} onChange={e => duzenleAtamaSatirGuncelle('paketci', i, 'istasyon', e.target.value)}>
+                      {ISTASYONLAR.paketci.map(ist => <option key={ist}>{ist}</option>)}
+                    </select>
+                    {(duzenleAtamalar.paketci || []).length > 1 && (
+                      <button className="btn btn-sm btn-danger" onClick={() => duzenleAtamaSatirSil('paketci', i)}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-between p-4 border-t border-gray-800">
+              <button className="btn btn-sm text-red-400" onClick={() => isEmriIptal(duzenleIe.id)}>İş Emrini İptal Et</button>
+              <div className="flex gap-2">
+                <button className="btn" onClick={() => setDuzenleModal(false)}>Kapat</button>
+                <button className="btn-primary" onClick={duzenleKaydet} disabled={kayit}>
+                  {kayit ? 'Kaydediliyor…' : 'Atamaları Güncelle'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* İş Emri Oluştur Modal */}
       {modal && seciliGun && (
