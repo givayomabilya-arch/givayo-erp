@@ -9,15 +9,18 @@ const ROL_MENULERI = {
     { href: '/uretim', label: 'Üretim Planı', icon: '🏭' },
     { href: '/katalog', label: 'Katalog', icon: '🗂️' },
     { href: '/tablet', label: 'Eleman Tableti', icon: '📱' },
+    { href: '/plan', label: 'Üretim Planla', icon: '📋' },
+    { href: '/gunluk', label: 'Günlük Plan', icon: '📅' },
     { href: '/yonetim', label: 'Kullanıcılar', icon: '👥' },
   ],
   foremen: [
     { href: '/', label: 'Dashboard', icon: '📊' },
-    { href: '/uretim', label: 'Üretim Planı', icon: '🏭' },
     { href: '/katalog', label: 'Katalog', icon: '🗂️' },
+    { href: '/gunluk', label: 'Günlük Plan', icon: '📅' },
   ],
   siparis: [
     { href: '/siparisler', label: 'Siparişler', icon: '📦' },
+    { href: '/plan', label: 'Üretim Planla', icon: '📋' },
   ],
   eleman: [
     { href: '/tablet', label: 'İş Listem', icon: '📱' },
@@ -26,7 +29,7 @@ const ROL_MENULERI = {
 
 const ROL_ETIKET = {
   yonetici: 'Yönetici',
-  foremen: 'Foremen',
+  foremen: 'Foreman',
   siparis: 'Sipariş',
   eleman: 'Eleman',
 }
