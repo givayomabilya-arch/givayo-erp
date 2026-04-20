@@ -78,7 +78,7 @@ export default function Tablet({ profil }) {
       .from('is_emirleri')
       .select('*')
       .eq('durum', 'aktif')
-      .order('created_at')
+      .order('uretim_tarihi', { ascending: true })
 
     const gorevler = []
     for (const ie of (emirler || [])) {
@@ -91,7 +91,7 @@ export default function Tablet({ profil }) {
         } else if (Array.isArray(deger)) {
           for (const s of deger) {
             if (s.istasyon === ist) {
-              gorevler.push({ ie_id: ie.id, ie_no: ie.is_emri_no, tip, parcalar: s.parcalar, urunler: ie.urun_listesi })
+              gorevler.push({ ie_id: ie.id, ie_no: ie.is_emri_no, tip, parcalar: s.parcalar, urunler: ie.urun_listesi, uretim_tarihi: ie.uretim_tarihi })
             }
           }
         }
@@ -244,9 +244,14 @@ export default function Tablet({ profil }) {
               <div key={idx} className={`card transition-all ${tam ? 'opacity-50 border-green-900' : ''}`}>
                 {/* Başlık */}
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="badge badge-gray text-xs">{tipLabel[g.tip]}</span>
                     <span className="text-xs text-gray-500 font-mono">{g.ie_no}</span>
+                    {g.uretim_tarihi && (
+                      <span className="text-xs bg-blue-950 text-blue-300 px-2 py-0.5 rounded-full">
+                        📅 {new Date(g.uretim_tarihi + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                      </span>
+                    )}
                     {g.parcalar && g.parcalar !== 'Tüm parçalar' && (
                       <span className="text-xs text-blue-400">Parça: {Array.isArray(g.parcalar) ? g.parcalar.join(', ') : g.parcalar}</span>
                     )}
