@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase' 
 
 const ROL_MENULERI = {
   yonetici: [
