@@ -8,7 +8,7 @@
 4. **Project Settings → API** sayfasından 2 değeri kopyala: 
    - Project URL → `.env.local` içindeki `NEXT_PUBLIC_SUPABASE_URL`
    - anon public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
+ 
 ## Adım 2: GitHub
 
 1. **github.com** → "New repository" → repo adı: `givayo-erp` → Public → Create
