@@ -5,7 +5,7 @@
 1. **supabase.com** → "Start your project" → GitHub ile giriş
 2. "New project" → proje adı: `givayo-erp` → şifre belirle → bölge: EU (Frankfurt)
 3. Proje açıldıktan sonra: **SQL Editor** → `supabase_schema.sql` dosyasının tüm içeriğini yapıştır → Run
-4. **Project Settings → API** sayfasından 2 değeri kopyala:
+4. **Project Settings → API** sayfasından 2 değeri kopyala: 
    - Project URL → `.env.local` içindeki `NEXT_PUBLIC_SUPABASE_URL`
    - anon public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
