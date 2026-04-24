@@ -95,7 +95,7 @@ export default function UretimPlaniSayfa({ profil }) {
   return (
     <div className="p-6">
       <div className="mb-5">
-        <h1 className="text-xl font-semibold">Üretim Planla <span className="text-xs bg-yellow-600 text-yellow-100 px-2 py-0.5 rounded-full ml-2">TEXT</span></h1>
+        <span className="text-xs bg-yellow-600 text-yellow-100 px-2 py-0.5 rounded-full ml-2">TEST</span>
         <p className="text-gray-500 text-sm mt-0.5">
           Toplam <span className="text-blue-400 font-medium">{toplamAdet} adet</span> sipariş · 
           <span className="text-green-400 font-medium"> {toplamPlanlanan} adet</span> planlandı · 
